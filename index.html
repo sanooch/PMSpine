@@ -1,0 +1,4304 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="SPINE" />
+  <title>SPINE — 3D Rotary CD Jukebox</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <style>
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100dvh;
+      background-color: #050507;
+      color: #f4f4f6;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      overflow: hidden;
+      overscroll-behavior: none;
+    }
+
+    #chassis-viewport {
+      width: 100vw;
+      height: 100dvh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #050507;
+      padding: 0;
+      transition: padding 0.3s ease;
+    }
+
+    #chassis-viewport.padded-mode {
+      background: radial-gradient(circle at center, #14151a 0%, #050507 100%);
+      padding: 16px;
+    }
+
+    #spine-device {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      background: #0a0a0d;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      padding-top: env(safe-area-inset-top, 0px);
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
+
+    #spine-device.preview-10-3 {
+      width: min(100%, calc((100dvh - 32px) * (10 / 3)));
+      height: auto;
+      aspect-ratio: 10 / 3;
+      border-radius: 18px;
+      border: 10px solid #1b1c22;
+      box-shadow: 0 30px 90px rgba(0, 0, 0, 0.95), inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+    }
+
+    #spine-device.preview-ipad {
+      width: min(100%, calc((100dvh - 32px) * (4 / 3)));
+      height: auto;
+      aspect-ratio: 4 / 3;
+      border-radius: 26px;
+      border: 14px solid #1b1c22;
+      box-shadow: 0 30px 90px rgba(0, 0, 0, 0.95), inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+    }
+
+    #spine-device.real-scale-127 {
+      width: var(--real-w, 309mm) !important;
+      height: var(--real-h, 92.7mm) !important;
+      max-width: 98vw;
+      aspect-ratio: 10 / 3;
+      border-radius: 14px;
+      border: 8px solid #1b1c22;
+      box-shadow: 0 25px 70px rgba(0, 0, 0, 0.95), 0 0 0 1px rgba(251, 191, 36, 0.35);
+    }
+
+    /* 좌측 상단 컴팩트 메뉴 버튼 & 스크롤 다운 드로어 */
+    #corner-menu-anchor {
+      position: absolute;
+      top: calc(env(safe-area-inset-top, 0px) + 12px);
+      left: 14px;
+      z-index: 60;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 8px;
+      pointer-events: none;
+    }
+
+    #corner-menu-trigger {
+      pointer-events: auto;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 13px;
+      border-radius: 999px;
+      background: rgba(20, 21, 27, 0.78);
+      backdrop-filter: blur(14px);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.65);
+      cursor: pointer;
+      transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+    }
+
+    #corner-menu-trigger:hover {
+      background: rgba(32, 34, 42, 0.95);
+      border-color: rgba(251, 191, 36, 0.45);
+    }
+
+    #back-to-artists-btn {
+      pointer-events: auto;
+    }
+
+    #corner-dropdown-panel {
+      pointer-events: none;
+      width: min(310px, 86vw);
+      max-height: min(calc(100dvh - 76px), calc(100% - 54px));
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
+      touch-action: pan-y;
+      border-radius: 16px;
+      background: rgba(16, 17, 22, 0.96);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.92);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      transform-origin: top left;
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(-8px) scale(0.96);
+      transition: opacity 0.22s ease, transform 0.24s cubic-bezier(0.22, 1, 0.36, 1), visibility 0s linear 0.22s;
+    }
+
+    #corner-dropdown-panel.open {
+      pointer-events: auto;
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(0) scale(1);
+      transition: opacity 0.22s ease, transform 0.24s cubic-bezier(0.22, 1, 0.36, 1), visibility 0s;
+    }
+
+    /* 3D 로터리 주크박스 & 일렬 SPINE 하이브리드 스테이지 */
+    #shelf-stage {
+      position: relative;
+      flex: 1;
+      width: 100%;
+      height: 100%;
+      background:
+        radial-gradient(ellipse at 50% 35%, rgba(251, 191, 36, 0.08) 0%, transparent 58%),
+        radial-gradient(ellipse at 50% 0%, rgba(255, 255, 255, 0.05) 0%, transparent 65%),
+        linear-gradient(180deg, #09090c 0%, #111217 86%, #070709 100%);
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      perspective: 1600px;
+      cursor: grab;
+      touch-action: pan-y;
+    }
+
+    #shelf-stage:active {
+      cursor: grabbing;
+    }
+
+    /* 초기 상태: 일렬 SPINE 선반 뷰 */
+    #spine-shelf-layer {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: flex-end;
+      padding-bottom: 14px;
+      transition: opacity 0.36s ease, transform 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+      z-index: 20;
+      pointer-events: auto;
+    }
+
+    #shelf-stage.rotary-mode #spine-shelf-layer {
+      opacity: 0;
+      transform: translateY(28px) scale(0.96);
+      pointer-events: none;
+    }
+
+    #shelf-rail {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 14px;
+      background: linear-gradient(180deg, #2d3039 0%, #1a1c22 55%, #0e0f13 100%);
+      border-top: 1px solid rgba(255, 255, 255, 0.16);
+      box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.85);
+      z-index: 15;
+      pointer-events: none;
+    }
+
+    #shelf-viewport {
+      width: 100%;
+      height: 100%;
+      overflow-x: auto;
+      overflow-y: hidden;
+      display: flex;
+      align-items: flex-end;
+      scrollbar-width: none;
+    }
+
+    #shelf-viewport::-webkit-scrollbar {
+      display: none;
+    }
+
+    #cd-track {
+      display: flex;
+      align-items: flex-end;
+      height: 84%;
+      padding: 0 46vw;
+      gap: 4px;
+    }
+
+    .cd-spine {
+      position: relative;
+      width: 34px;
+      height: 100%;
+      border-radius: 4px 4px 1px 1px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 0 8px;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition:
+        transform 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+        margin 0.34s cubic-bezier(0.22, 1, 0.36, 1),
+        filter 0.2s ease,
+        box-shadow 0.25s ease;
+      box-shadow:
+        inset 1px 0 0 rgba(255, 255, 255, 0.28),
+        inset -1px 0 0 rgba(0, 0, 0, 0.55),
+        2px 0 8px rgba(0, 0, 0, 0.7);
+      overflow: hidden;
+    }
+
+    .cd-spine:hover {
+      transform: translateY(-10px);
+      filter: brightness(1.12);
+      z-index: 10;
+    }
+
+    .cd-spine.selected {
+      transform: translateY(-12px);
+      box-shadow: 0 0 0 1px rgba(251, 191, 36, 0.8), 0 12px 26px rgba(0, 0, 0, 0.92);
+    }
+
+    .jewel-teeth {
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 4px;
+      background: repeating-linear-gradient(
+        180deg,
+        rgba(255, 255, 255, 0.22) 0px,
+        rgba(255, 255, 255, 0.22) 2px,
+        rgba(0, 0, 0, 0.35) 2px,
+        rgba(0, 0, 0, 0.35) 4px
+      );
+      border-right: 1px solid rgba(255, 255, 255, 0.14);
+      pointer-events: none;
+    }
+
+    .acrylic-sheen {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(
+        105deg,
+        rgba(255, 255, 255, 0.16) 0%,
+        rgba(255, 255, 255, 0.03) 38%,
+        transparent 52%,
+        rgba(255, 255, 255, 0.08) 100%
+      );
+      pointer-events: none;
+    }
+
+    .spine-top-tag {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 7.5px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      opacity: 0.75;
+      writing-mode: vertical-rl;
+      max-height: 36px;
+      overflow: hidden;
+      padding-left: 3px;
+    }
+
+    .spine-title-wrap {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      writing-mode: vertical-rl;
+      overflow: hidden;
+      padding: 6px 0 6px 3px;
+      gap: 6px;
+    }
+
+    .spine-artist {
+      font-size: 9.5px;
+      font-weight: 800;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-height: 44%;
+    }
+
+    .spine-sep {
+      opacity: 0.45;
+      font-size: 8px;
+    }
+
+    .spine-album {
+      font-size: 9px;
+      font-weight: 500;
+      opacity: 0.88;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-height: 48%;
+    }
+
+    .spine-bottom-logo {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 6.5px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      opacity: 0.6;
+      padding-left: 3px;
+    }
+
+    /* 앨범 선택 시 활성화되는 3D 로터리 드럼 레이어 */
+    #rotary-drum-layer {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      transform: scale(0.92);
+      pointer-events: none;
+      transition: opacity 0.38s ease, transform 0.44s cubic-bezier(0.22, 1, 0.36, 1);
+      z-index: 10;
+    }
+
+    #shelf-stage.rotary-mode #rotary-drum-layer {
+      opacity: 1;
+      transform: scale(1);
+      pointer-events: auto;
+      z-index: 22;
+    }
+
+    /* 하단 원형 턴테이블 링 */
+    #rotary-turntable-ring {
+      position: absolute;
+      bottom: 6%;
+      left: 50%;
+      width: min(86vw, 860px);
+      height: 130px;
+      border-radius: 50%;
+      border: 1px solid rgba(251, 191, 36, 0.24);
+      box-shadow: 0 0 70px rgba(251, 191, 36, 0.09), inset 0 0 40px rgba(251, 191, 36, 0.06);
+      background: radial-gradient(ellipse at center, rgba(251, 191, 36, 0.08) 0%, transparent 72%);
+      transform: translateX(-50%) rotateX(74deg);
+      pointer-events: none;
+      z-index: 4;
+    }
+
+    #rotary-wheel {
+      position: absolute;
+      inset: 0;
+      transform-style: preserve-3d;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
+    }
+
+    /* 원통형 드럼 위에 배치되는 개별 CD 슬롯 */
+    .rotary-slot {
+      position: absolute;
+      height: min(84%, 74vw);
+      aspect-ratio: 1 / 1;
+      border-radius: 10px;
+      overflow: hidden;
+      cursor: pointer;
+      transform-style: preserve-3d;
+      transition: transform 0.36s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.28s ease, filter 0.28s ease;
+      box-shadow:
+        0 24px 55px rgba(0, 0, 0, 0.88),
+        0 0 0 1px rgba(255, 255, 255, 0.14);
+      background: #14151a;
+    }
+
+    .rotary-slot img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      pointer-events: none;
+    }
+
+    /* 슬롯 왼쪽 투명 아크릴 주얼 케이스 스파인 엣지 */
+    .slot-jewel-edge {
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 18px;
+      background: linear-gradient(90deg, rgba(255,255,255,0.24) 0%, rgba(255,255,255,0.05) 38%, rgba(0,0,0,0.72) 100%);
+      border-right: 1px solid rgba(255, 255, 255, 0.16);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      z-index: 3;
+    }
+
+    .slot-jewel-edge span {
+      writing-mode: vertical-rl;
+      transform: rotate(180deg);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 8px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      color: rgba(255, 255, 255, 0.72);
+      white-space: nowrap;
+      max-height: 82%;
+      overflow: hidden;
+    }
+
+    /* 중앙 앨범 쇼케이스 오버레이 (정사각형 3D 플립 + 우측 CD 부클릿 가사창) */
+    #expanded-showcase {
+      position: absolute;
+      inset: 0;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0px;
+      pointer-events: none;
+      z-index: 45;
+      opacity: 0;
+      visibility: hidden;
+      transform: translateZ(260px) scale(0.95);
+      transition: opacity 0.28s ease, transform 0.32s cubic-bezier(0.22, 1, 0.36, 1), gap 0.36s cubic-bezier(0.22, 1, 0.36, 1), visibility 0s linear 0.28s;
+    }
+
+    #expanded-showcase.active {
+      opacity: 1;
+      visibility: visible;
+      transform: translateZ(260px) scale(1);
+      transition: opacity 0.28s ease, transform 0.32s cubic-bezier(0.22, 1, 0.36, 1), gap 0.36s cubic-bezier(0.22, 1, 0.36, 1), visibility 0s;
+    }
+
+    #expanded-showcase.has-lyrics {
+      gap: 16px;
+    }
+
+    #showcase-card {
+      pointer-events: auto;
+      position: relative;
+      height: min(86%, 76vw);
+      max-height: calc(100% - 16px);
+      aspect-ratio: 1 / 1;
+      width: auto;
+      flex-shrink: 0;
+      transform-style: preserve-3d;
+      transition: transform 0.6s cubic-bezier(0.23, 1, 0.32, 1);
+      border-radius: 16px;
+      box-shadow:
+        0 28px 70px rgba(0, 0, 0, 0.94),
+        0 0 0 1px rgba(255, 255, 255, 0.16);
+    }
+
+    #showcase-card.flipped {
+      transform: rotateY(180deg);
+    }
+
+    .card-face {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
+      border-radius: 14px;
+      overflow: hidden;
+    }
+
+    .card-front {
+      background: #121316;
+      cursor: pointer;
+    }
+
+    .card-back {
+      background: rgba(13, 14, 18, 0.97);
+      backdrop-filter: blur(22px);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      transform: rotateY(180deg);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 16px;
+    }
+
+    /* 우측 CD 부클릿 가사창 */
+    #lyrics-booklet {
+      pointer-events: none;
+      width: 0;
+      height: min(86%, 76vw);
+      max-height: calc(100% - 16px);
+      opacity: 0;
+      overflow: hidden;
+      border-radius: 14px;
+      background: rgba(16, 17, 22, 0.96);
+      backdrop-filter: blur(22px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      box-shadow: 0 28px 70px rgba(0, 0, 0, 0.94);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      transition: width 0.38s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.28s ease;
+    }
+
+    #expanded-showcase.has-lyrics #lyrics-booklet {
+      width: min(46vw, 560px);
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    /* 비주얼라이저 전체화면 모드 (선택된 기기 프레임 #spine-device 영역 내부에 꽉 차도록 맞춤) */
+    #lyrics-booklet.visualizer-fullscreen {
+      position: absolute !important;
+      inset: 0 !important;
+      width: 100% !important;
+      height: 100% !important;
+      max-width: 100% !important;
+      max-height: 100% !important;
+      opacity: 1 !important;
+      pointer-events: auto !important;
+      border-radius: 0 !important;
+      border: none !important;
+      z-index: 80 !important;
+    }
+
+    /* 부클릿 상단 토글 메뉴 드롭다운 */
+    #booklet-menu-drawer {
+      transform-origin: top right;
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transform: translateY(-6px) scale(0.96);
+      transition: opacity 0.2s ease, transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), visibility 0s linear 0.2s;
+    }
+
+    #booklet-menu-drawer.open {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+      transform: translateY(0) scale(1);
+      transition: opacity 0.2s ease, transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), visibility 0s;
+    }
+
+    .lyric-line {
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 17px;
+      line-height: 1.55;
+      color: rgba(255, 255, 255, 0.42);
+      transition: color 0.25s ease, transform 0.25s ease, background 0.25s ease;
+      cursor: pointer;
+    }
+
+    .lyric-line:hover {
+      color: rgba(255, 255, 255, 0.85);
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .lyric-line.active {
+      color: #fde68a;
+      font-weight: 700;
+      transform: scale(1.02);
+      background: linear-gradient(
+        90deg,
+        rgba(251, 191, 36, 0.25) calc(var(--line-progress, 0) * 100%),
+        rgba(255, 255, 255, 0.06) calc(var(--line-progress, 0) * 100%)
+      );
+    }
+
+    /* 앨범 커버 하단 플레잉 바 */
+    #cover-playing-bar {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: linear-gradient(0deg, rgba(6, 6, 9, 0.96) 0%, rgba(10, 10, 14, 0.88) 85%, transparent 100%);
+      backdrop-filter: blur(14px);
+      padding: 18px 14px 12px;
+      border-top: 1px solid rgba(255, 255, 255, 0.12);
+      transform: translateY(100%);
+      opacity: 0;
+      pointer-events: none;
+      transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.3s ease;
+    }
+
+    #cover-playing-bar.visible {
+      transform: translateY(0);
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    /* 가사창이 열렸을 때는 앨범 커버 하단 바를 숨겨 아트워크 전체를 온전히 표시 */
+    #expanded-showcase.has-lyrics #cover-playing-bar {
+      transform: translateY(100%);
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    /* 가사창 하단 전용 플레잉 바 */
+    #lyrics-playing-bar {
+      display: none;
+      flex-shrink: 0;
+      background: rgba(10, 11, 15, 0.96);
+      border-top: 1px solid rgba(255, 255, 255, 0.12);
+      padding: 10px 14px;
+    }
+
+    #lyrics-playing-bar.visible {
+      display: block;
+    }
+
+    .custom-scroll::-webkit-scrollbar {
+      width: 4px;
+    }
+    .custom-scroll::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.04);
+      border-radius: 4px;
+    }
+    .custom-scroll::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.22);
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div id="chassis-viewport">
+    <div id="spine-device">
+      <!-- 좌측 상단 단일 트리거 버튼 + 스크롤 다운 메뉴 패널 -->
+      <div id="corner-menu-anchor">
+        <div class="flex items-center gap-2">
+          <button id="corner-menu-trigger" onclick="toggleCornerMenu()" title="메뉴 열기/닫기">
+            <span class="w-2 h-2 rounded-full bg-amber-400 shadow-[0_0_8px_#fbbf24]"></span>
+            <span class="font-mono text-xs font-extrabold tracking-widest text-white">SPINE</span>
+            <span id="corner-menu-arrow" class="font-mono text-[10px] text-zinc-400 transition-transform duration-200">▼</span>
+          </button>
+
+          <!-- 아티스트 앨범 목록 상태일 때만 바로 눌러 복귀할 수 있는 컴팩트 백 버튼 -->
+          <button
+            id="back-to-artists-btn"
+            onclick="backToArtistRotary()"
+            class="hidden px-3 py-1.5 rounded-full bg-amber-400/20 hover:bg-amber-400/30 backdrop-blur-md border border-amber-400/50 text-[11px] font-bold text-amber-300 shadow-lg transition"
+          >
+            ◀ 아티스트 목록
+          </button>
+        </div>
+
+        <!-- 스크롤 다운 드롭다운 메뉴 -->
+        <div
+          id="corner-dropdown-panel"
+          class="custom-scroll"
+          onclick="event.stopPropagation()"
+          onwheel="event.stopPropagation()"
+          ontouchstart="event.stopPropagation()"
+          ontouchmove="event.stopPropagation()"
+        >
+          <!-- 1. 서버 연결 상태 & 카운터 -->
+          <div class="flex items-center justify-between gap-2 pb-2.5 border-b border-white/10">
+            <span id="plex-badge" class="px-2 py-0.5 rounded bg-zinc-800/90 border border-white/10 font-mono text-[10px] text-zinc-400">
+              CONNECTING...
+            </span>
+            <span id="album-counter" class="font-mono text-[11px] font-bold text-zinc-300">0 ALBUMS</span>
+          </div>
+
+          <!-- 2. 보기 기준 전환 (앨범별 / 아티스트별) -->
+          <div class="space-y-1.5">
+            <div class="font-mono text-[10px] uppercase tracking-wider text-zinc-400">보기 기준</div>
+            <div class="grid grid-cols-2 gap-1 rounded-xl bg-black/60 border border-white/15 p-1 text-xs font-semibold">
+              <button
+                id="mode-albums-btn"
+                onclick="setBrowseMode('albums'); toggleCornerMenu(false);"
+                class="py-1.5 rounded-lg bg-amber-400 text-zinc-950 font-bold transition"
+              >
+                앨범별
+              </button>
+              <button
+                id="mode-artists-btn"
+                onclick="setBrowseMode('artists'); toggleCornerMenu(false);"
+                class="py-1.5 rounded-lg text-zinc-300 hover:text-white transition"
+              >
+                아티스트별
+              </button>
+            </div>
+          </div>
+
+          <!-- 3. 검색 및 정렬 -->
+          <div class="space-y-2">
+            <div class="font-mono text-[10px] uppercase tracking-wider text-zinc-400">검색 및 정렬</div>
+            <input
+              id="search-input"
+              type="text"
+              placeholder="아티스트 / 앨범 검색..."
+              oninput="handleSearch(this.value)"
+              class="w-full px-3 py-1.5 rounded-xl bg-black/60 border border-white/15 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-amber-400"
+            />
+            <select
+              id="sort-select"
+              onchange="handleSort(this.value)"
+              class="w-full px-2.5 py-1.5 rounded-xl bg-zinc-800 border border-white/15 text-xs text-zinc-200 focus:outline-none"
+            >
+              <option value="artist">아티스트순 정렬</option>
+              <option value="recent">최근 추가순 정렬</option>
+              <option value="year">발매연도순 정렬</option>
+              <option value="random">랜덤 셔플</option>
+            </select>
+          </div>
+
+          <!-- 4. 빠른 인덱스 점프 -->
+          <div class="space-y-1.5">
+            <div class="font-mono text-[10px] uppercase tracking-wider text-zinc-400">빠른 인덱스 이동</div>
+            <div id="alpha-index" class="flex flex-wrap items-center gap-1 font-mono text-[10px] text-zinc-300"></div>
+          </div>
+
+          <!-- 5. 디스플레이 비율 & 서버 설정 -->
+          <div class="space-y-2 pt-2 border-t border-white/10">
+            <div class="font-mono text-[10px] uppercase tracking-wider text-zinc-400">디스플레이 &amp; 서버</div>
+            <select
+              id="monitor-inch-select"
+              onchange="applyRealScaleMode(this.value)"
+              title="화면 비율 및 기기 크기 선택"
+              class="w-full px-2.5 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 border border-white/15 font-mono text-[11px] text-amber-300 focus:outline-none"
+            >
+              <option value="full" selected>아이패드 / 전체화면 꽉채움</option>
+              <option value="ipad">iPad 가로 (4:3) 미리보기</option>
+              <option value="fit">10:3 바 디스플레이 미리보기</option>
+              <option value="real">12.7" 실물크기 (30.9×9.3cm)</option>
+              <option value="27">27" 모니터 기준 1:1</option>
+              <option value="32">32" 모니터 기준 1:1</option>
+            </select>
+            <button
+              onclick="toggleCornerMenu(false); toggleSettingsModal(true);"
+              class="w-full py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-400/40 text-xs font-semibold text-amber-300 transition"
+            >
+              PLEX 서버 연결 설정
+            </button>
+          </div>
+
+          <!-- 상태 메시지 & 단축키 안내 -->
+          <div class="pt-2 border-t border-white/10 space-y-1">
+            <div id="status-toast" class="text-[11px] text-amber-300/90 leading-snug"></div>
+            <div class="text-[10px] font-mono text-zinc-500">◀ ▶ 이동 • 커버클릭 트랙 • ESC 복귀</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 메인 3D 로터리 주크박스 무대 -->
+      <main id="shelf-stage">
+        <!-- 1단계: 초기 일렬 SPINE CD 선반 -->
+        <div id="spine-shelf-layer">
+          <div id="shelf-viewport">
+            <div id="cd-track"></div>
+          </div>
+          <div id="shelf-rail"></div>
+        </div>
+
+        <!-- 2단계: 앨범 선택 후 전환되는 3D 로터리 드럼 -->
+        <div id="rotary-drum-layer">
+          <div id="rotary-turntable-ring"></div>
+          <div id="rotary-wheel"></div>
+
+          <!-- 좌우 회전 버튼 -->
+          <button
+            onclick="event.stopPropagation(); stepRotary(-1);"
+            title="이전 앨범 (◀)"
+            class="absolute left-3 sm:left-5 top-1/2 -translate-y-1/2 z-30 w-10 h-10 rounded-full bg-black/55 hover:bg-black/85 border border-white/15 text-white text-lg flex items-center justify-center backdrop-blur-md transition"
+          >
+            ‹
+          </button>
+          <button
+            onclick="event.stopPropagation(); stepRotary(1);"
+            title="다음 앨범 (▶)"
+            class="absolute right-3 sm:right-5 top-1/2 -translate-y-1/2 z-30 w-10 h-10 rounded-full bg-black/55 hover:bg-black/85 border border-white/15 text-white text-lg flex items-center justify-center backdrop-blur-md transition"
+          >
+            ›
+          </button>
+        </div>
+
+        <!-- 중앙 펼쳐진 앨범 쇼케이스 + 우측 CD 부클릿 가사/비주얼라이저 창 -->
+        <div id="expanded-showcase">
+          <div id="showcase-card">
+            <!-- 앞면: 정사각형 앨범 커버 + 하단 플레잉 바 -->
+            <div class="card-face card-front group" onclick="handleFrontCoverClick()" title="클릭하여 곡 리스트 보기">
+              <img
+                id="showcase-cover-img"
+                alt="Album Cover"
+                class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.02] hidden"
+              />
+              <div id="showcase-cover-fallback" class="hidden absolute inset-0 flex flex-col justify-between p-5 bg-gradient-to-br from-zinc-800 to-zinc-950">
+                <span id="fb-label" class="text-[10px] font-mono uppercase tracking-widest opacity-70"></span>
+                <div>
+                  <div id="fb-artist" class="text-sm font-bold text-white/90"></div>
+                  <div id="fb-title" class="text-lg font-extrabold text-white leading-tight mt-1"></div>
+                </div>
+              </div>
+
+              <!-- 상단 닫기 & 트랙/가사 버튼 -->
+              <button
+                onclick="event.stopPropagation(); collapseShowcase();"
+                title="드럼으로 접기 (ESC)"
+                class="absolute top-2.5 left-2.5 w-7 h-7 rounded-full bg-black/65 hover:bg-black/90 text-white/85 hover:text-white flex items-center justify-center text-xs border border-white/15 transition z-10"
+              >
+                ✕
+              </button>
+              <div class="absolute top-2.5 right-2.5 flex items-center gap-1.5 z-10">
+                <button
+                  onclick="event.stopPropagation(); toggleLyricsBooklet();"
+                  class="px-2.5 py-1 rounded-full bg-black/65 hover:bg-black/90 backdrop-blur-md border border-white/15 text-[10px] font-mono text-amber-300 transition"
+                >
+                  LYRICS
+                </button>
+                <div class="px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md border border-white/15 text-[10px] font-mono text-white/85 pointer-events-none">
+                  TRACKLIST ↻
+                </div>
+              </div>
+
+              <!-- 곡 선택 후 나타나는 하단 플레잉 바 -->
+              <div id="cover-playing-bar" onclick="event.stopPropagation()">
+                <div class="flex items-center justify-between gap-2 mb-1.5">
+                  <div class="min-w-0 flex-1">
+                    <div id="now-playing-title" class="text-xs font-bold text-white truncate">트랙 제목</div>
+                    <div id="now-playing-artist" class="text-[10px] text-amber-400/90 truncate">아티스트</div>
+                  </div>
+                  <div class="flex items-center gap-1.5 flex-shrink-0">
+                    <button onclick="prevTrack()" class="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-[11px] text-white transition">⏮</button>
+                    <button onclick="togglePlayPause()" id="play-pause-btn" class="w-8 h-8 rounded-full bg-amber-400 hover:bg-amber-300 text-zinc-950 font-bold flex items-center justify-center text-xs shadow transition">▶</button>
+                    <button onclick="nextTrack()" class="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-[11px] text-white transition">⏭</button>
+                  </div>
+                </div>
+                <div class="flex items-center gap-2">
+                  <div class="flex-1 h-1.5 bg-white/15 rounded-full overflow-hidden cursor-pointer" onclick="seekAudio(event)">
+                    <div id="audio-progress" class="h-full bg-amber-400 w-0 transition-all duration-150"></div>
+                  </div>
+                  <span id="audio-time" class="text-[10px] font-mono text-zinc-300 flex-shrink-0">0:00</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 뒷면: 곡 리스트 -->
+            <div class="card-face card-back">
+              <div class="flex items-start justify-between gap-2 pb-2 border-b border-white/10">
+                <div class="min-w-0">
+                  <div id="sc-artist" class="text-[11px] font-bold uppercase tracking-wider text-amber-400 truncate">ARTIST</div>
+                  <h2 id="sc-title" class="text-sm font-extrabold text-white truncate mt-0.5">Album Title</h2>
+                </div>
+                <button
+                  onclick="flipCard(false)"
+                  title="앨범 커버로 돌아가기"
+                  class="px-2 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 border border-white/15 text-[10px] font-mono text-zinc-200 flex-shrink-0 transition"
+                >
+                  COVER ↺
+                </button>
+              </div>
+
+              <div id="sc-tracks" class="my-2 flex-1 overflow-y-auto custom-scroll space-y-1 pr-1"></div>
+
+              <div class="pt-1.5 border-t border-white/10 flex items-center justify-between text-[10px] font-mono text-zinc-400">
+                <span id="sc-meta">2024 • FLAC</span>
+                <span>곡을 선택하면 재생됩니다</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 우측 CD 부클릿 가사 & 오디오 비주얼라이저 창 -->
+          <div id="lyrics-booklet" class="relative" onclick="event.stopPropagation()">
+            <!-- 우측 상단 컴팩트 메뉴 토글 버튼 & 닫기 버튼 (상시 노출 최소화) -->
+            <div class="absolute top-2.5 right-2.5 z-30 flex items-center gap-1.5">
+              <button
+                id="booklet-menu-toggle-btn"
+                onclick="toggleBookletHeaderMenu()"
+                title="부클릿 모드 및 설정 열기/닫기"
+                class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/65 hover:bg-black/90 backdrop-blur-md border border-white/15 text-[10px] font-mono text-amber-300 shadow-lg transition"
+              >
+                <span id="lyrics-sync-badge" class="font-bold">LYRICS</span>
+                <span id="booklet-menu-arrow" class="text-[9px] text-zinc-300 transition-transform duration-200">▼</span>
+              </button>
+              <button
+                id="booklet-fullscreen-btn"
+                onclick="toggleBookletFullscreen()"
+                title="비주얼라이저 전체화면 전환"
+                class="hidden w-7 h-7 rounded-full bg-black/65 hover:bg-amber-400/25 hover:text-amber-300 backdrop-blur-md border border-white/15 text-xs text-zinc-200 flex items-center justify-center shadow-lg transition"
+              >
+                ⛶
+              </button>
+              <button
+                onclick="toggleLyricsBooklet(false)"
+                title="부클릿 창 닫기"
+                class="w-7 h-7 rounded-full bg-black/65 hover:bg-black/90 backdrop-blur-md border border-white/15 text-xs text-zinc-300 hover:text-white flex items-center justify-center shadow-lg transition"
+              >
+                ✕
+              </button>
+            </div>
+
+            <!-- 토글 시 펼쳐지는 플로팅 상단 메뉴 패널 -->
+            <div
+              id="booklet-menu-drawer"
+              class="absolute top-11 right-2.5 left-2.5 z-30 rounded-xl bg-zinc-900/95 backdrop-blur-xl border border-white/15 shadow-2xl p-2.5 space-y-2"
+            >
+              <div class="flex items-center justify-between gap-2 pb-1.5 border-b border-white/10">
+                <div class="min-w-0">
+                  <div class="font-mono text-[9px] font-bold tracking-wider text-amber-400">CD BOOKLET &amp; VISUALIZER</div>
+                  <div id="lyrics-track-name" class="text-xs font-bold text-white truncate">트랙을 선택하세요</div>
+                </div>
+              </div>
+
+              <!-- 뷰 모드 전환 스위치 (기존 5종 + 신규 5종 = 총 10종) -->
+              <div class="grid grid-cols-5 gap-1 rounded-lg bg-black/60 border border-white/15 p-1">
+                <button
+                  id="booklet-mode-lyrics"
+                  onclick="setBookletViewMode('lyrics')"
+                  title="가사 보기"
+                  class="py-1 rounded-md font-mono text-[9px] font-bold bg-amber-400 text-zinc-950 transition"
+                >
+                  LYRICS
+                </button>
+                <button
+                  id="booklet-mode-scope"
+                  onclick="setBookletViewMode('scope')"
+                  title="CRT 오실로스코프 파형"
+                  class="py-1 rounded-md font-mono text-[9px] font-bold text-zinc-300 hover:text-white transition"
+                >
+                  SCOPE
+                </button>
+                <button
+                  id="booklet-mode-vu"
+                  onclick="setBookletViewMode('vu')"
+                  title="매킨토시 아날로그 듀얼 VU 미터"
+                  class="py-1 rounded-md font-mono text-[9px] font-bold text-zinc-300 hover:text-white transition"
+                >
+                  VU
+                </button>
+                <button
+                  id="booklet-mode-aurora"
+                  onclick="setBookletViewMode('aurora')"
+                  title="오로라 웨이브 리본 비주얼라이저"
+                  class="py-1 rounded-md font-mono text-[9px] font-bold text-zinc-300 hover:text-white transition"
+                >
+                  AURORA
+                </button>
+                <button
+                  id="booklet-mode-disc"
+                  onclick="setBookletViewMode('disc')"
+                  title="바이닐 디스크 라디얼 스펙트럼"
+                  class="py-1 rounded-md font-mono text-[9px] font-bold text-zinc-300 hover:text-white transition"
+                >
+                  DISC
+                </button>
+                <button
+                  id="booklet-mode-reel"
+                  onclick="setBookletViewMode('reel')"
+                  title="빈티지 듀얼 릴투릴 테이프 데크"
+                  class="py-1 rounded-md font-mono text-[9px] font-bold text-zinc-300 hover:text-white transition"
+                >
+                  REEL
+                </button>
+                <button
+                  id="booklet-mode-tube"
+                  onclick="setBookletViewMode('tube')"
+                  title="진공관 앰프 히터 & 블루 글로우"
+                  class="py-1 rounded-md font-mono text-[9px] font-bold text-zinc-300 hover:text-white transition"
+                >
+                  TUBE
+                </button>
+                <button
+                  id="booklet-mode-phase"
+                  onclick="setBookletViewMode('phase')"
+                  title="리사주 스테레오 위상 스코프"
+                  class="py-1 rounded-md font-mono text-[9px] font-bold text-zinc-300 hover:text-white transition"
+                >
+                  PHASE
+                </button>
+                <button
+                  id="booklet-mode-matrix"
+                  onclick="setBookletViewMode('matrix')"
+                  title="도트 LED 피크 홀드 이퀄라이저"
+                  class="py-1 rounded-md font-mono text-[9px] font-bold text-zinc-300 hover:text-white transition"
+                >
+                  MATRIX
+                </button>
+                <button
+                  id="booklet-mode-ripple"
+                  onclick="setBookletViewMode('ripple')"
+                  title="워터 리플 동심원 파동"
+                  class="py-1 rounded-md font-mono text-[9px] font-bold text-zinc-300 hover:text-white transition"
+                >
+                  RIPPLE
+                </button>
+              </div>
+
+              <!-- 가사 싱크 조절 컨트롤 (LYRICS 모드일 때만 노출) -->
+              <div id="lyrics-sync-controls" class="flex items-center justify-between pt-0.5">
+                <span class="font-mono text-[10px] text-zinc-400">가사 싱크 미세조정</span>
+                <div class="flex items-center gap-1">
+                  <button onclick="shiftLyricsOffset(-0.5)" class="px-2 py-0.5 rounded bg-white/10 hover:bg-white/20 font-mono text-[10px] text-zinc-200">-0.5s</button>
+                  <button onclick="shiftLyricsOffset(0.5)" class="px-2 py-0.5 rounded bg-white/10 hover:bg-white/20 font-mono text-[10px] text-zinc-200">+0.5s</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- 1. 가사 스크롤 영역 -->
+            <div id="lyrics-lines-box" class="flex-1 overflow-y-auto custom-scroll px-3 pt-11 pb-4 space-y-1 scroll-smooth">
+              <div class="text-xs text-zinc-500 text-center py-10">곡을 선택하면 가사가 표시됩니다.</div>
+            </div>
+
+            <!-- 2. 비주얼라이저 캔버스 영역 -->
+            <div id="booklet-visualizer-box" class="hidden flex-1 relative overflow-hidden bg-[#07080b]">
+              <canvas id="booklet-visualizer-canvas" class="w-full h-full block"></canvas>
+            </div>
+
+            <!-- 가사창 열림 시 표시되는 하단 플레잉 컨트롤 & 상태바 -->
+            <div id="lyrics-playing-bar">
+              <div class="flex items-center justify-between gap-2 mb-1.5">
+                <div class="min-w-0 flex-1">
+                  <div id="lyrics-now-playing-title" class="text-xs font-bold text-white truncate">트랙 제목</div>
+                  <div id="lyrics-now-playing-artist" class="text-[10px] text-amber-400/90 truncate">아티스트</div>
+                </div>
+                <div class="flex items-center gap-1.5 flex-shrink-0">
+                  <button onclick="prevTrack()" class="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-[11px] text-white transition">⏮</button>
+                  <button onclick="togglePlayPause()" id="lyrics-play-pause-btn" class="w-8 h-8 rounded-full bg-amber-400 hover:bg-amber-300 text-zinc-950 font-bold flex items-center justify-center text-xs shadow transition">▶</button>
+                  <button onclick="nextTrack()" class="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-[11px] text-white transition">⏭</button>
+                </div>
+              </div>
+              <div class="flex items-center gap-2">
+                <div class="flex-1 h-1.5 bg-white/15 rounded-full overflow-hidden cursor-pointer" onclick="seekAudio(event)">
+                  <div id="lyrics-audio-progress" class="h-full bg-amber-400 w-0 transition-all duration-150"></div>
+                </div>
+                <span id="lyrics-audio-time" class="text-[10px] font-mono text-zinc-300 flex-shrink-0">0:00</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <!-- Plex 연결 설정 모달 -->
+  <div id="settings-modal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="w-full max-w-md rounded-2xl bg-zinc-900 border border-white/15 p-5 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between">
+        <h3 class="text-sm font-bold text-white">Plex Media Server 연동 설정</h3>
+        <button onclick="toggleSettingsModal(false)" class="text-zinc-400 hover:text-white text-sm">✕</button>
+      </div>
+      <div class="space-y-3 text-xs">
+        <div>
+          <label class="block text-zinc-400 mb-1">Plex 서버 주소 (URL)</label>
+          <input id="cfg-url" type="text" class="w-full px-3 py-2 rounded-lg bg-black/60 border border-white/15 text-white font-mono text-xs" />
+        </div>
+        <div>
+          <label class="block text-zinc-400 mb-1">X-Plex-Token</label>
+          <input id="cfg-token" type="password" class="w-full px-3 py-2 rounded-lg bg-black/60 border border-white/15 text-white font-mono text-xs" />
+        </div>
+        <div>
+          <label class="block text-zinc-400 mb-1">음악 라이브러리 Section ID</label>
+          <input id="cfg-section" type="text" class="w-full px-3 py-2 rounded-lg bg-black/60 border border-white/15 text-white font-mono text-xs" />
+        </div>
+      </div>
+      <div class="flex justify-end gap-2 pt-2">
+        <button onclick="toggleSettingsModal(false)" class="px-3 py-1.5 rounded-lg bg-zinc-800 text-zinc-300 text-xs">취소</button>
+        <button onclick="saveAndConnectPlex()" class="px-4 py-1.5 rounded-lg bg-amber-400 hover:bg-amber-300 text-zinc-950 font-bold text-xs">저장 및 불러오기</button>
+      </div>
+    </div>
+  </div>
+
+  <audio id="audio-player" preload="none"></audio>
+
+  <script>
+    const LOCAL_DEFAULT_CONFIG = {
+      url: 'https://192-168-0-83.1af3d10e0c394c4ead70e15e85b491b2.plex.direct:32400',
+      token: '48V2nhwYeXs7aBCkTV8d',
+      section: '7'
+    };
+
+    let plexConfig = (() => {
+      try {
+        const saved = JSON.parse(localStorage.getItem('spine_plex_local_cfg_v1'));
+        return saved && saved.url ? saved : { ...LOCAL_DEFAULT_CONFIG };
+      } catch (e) {
+        return { ...LOCAL_DEFAULT_CONFIG };
+      }
+    })();
+
+    const SPINE_PALETTES = [
+      { bg: '#18181b', fg: '#f4f4f5' },
+      { bg: '#f4f4f5', fg: '#18181b' },
+      { bg: '#991b1b', fg: '#fef2f2' },
+      { bg: '#1e3a8a', fg: '#eff6ff' },
+      { bg: '#065f46', fg: '#ecfdf5' },
+      { bg: '#92400e', fg: '#fffbeb' },
+      { bg: '#3f3f46', fg: '#fafafa' },
+      { bg: '#581c87', fg: '#faf5ff' },
+      { bg: '#d97706', fg: '#18181b' },
+      { bg: '#0f172a', fg: '#38bdf8' }
+    ];
+
+    const DEMO_ALBUMS = [
+      { id: 'd1', artist: 'Michael Jackson', title: '20th Century Masters: The Millennium Collection', year: '2000', label: 'Motown', addedAt: 1727145655, palette: SPINE_PALETTES[0], coverUrl: '' },
+      { id: 'd2', artist: 'Elton John', title: 'The Big Picture', year: '1997', label: 'The Rocket Record Company', addedAt: 1727150626, palette: SPINE_PALETTES[1], coverUrl: '' },
+      { id: 'd3', artist: 'Daft Punk', title: 'Random Access Memories', year: '2013', label: 'Columbia', addedAt: 1727100000, palette: SPINE_PALETTES[2], coverUrl: '' },
+      { id: 'd4', artist: 'Miles Davis', title: 'Kind of Blue', year: '1959', label: 'Columbia', addedAt: 1727090000, palette: SPINE_PALETTES[3], coverUrl: '' },
+      { id: 'd5', artist: 'Pink Floyd', title: 'The Dark Side of the Moon', year: '1973', label: 'Harvest', addedAt: 1727080000, palette: SPINE_PALETTES[0], coverUrl: '' },
+      { id: 'd6', artist: 'Radiohead', title: 'OK Computer', year: '1997', label: 'Parlophone', addedAt: 1727070000, palette: SPINE_PALETTES[1], coverUrl: '' }
+    ];
+
+    let allAlbums = [];
+    let filteredAlbums = [];
+    let artistPhotoMap = new Map();
+    let uiMode = 'ALBUM_SPINE';
+    let artistGroups = [];
+    let selectedArtistName = null;
+    let artistRotaryIndex = 0;
+    let selectedId = null;
+    let rotaryIndex = 0;
+    let isLyricsOpen = false;
+    let bookletViewMode = 'lyrics';
+    let isBookletMenuOpen = false;
+    let isBookletFullscreen = false;
+    let currentTracks = [];
+    let currentTrackIdx = -1;
+    let parsedLyrics = [];
+    let lyricsOffset = 0;
+    let isCornerMenuOpen = false;
+
+    const isExpandedMode = () => uiMode === 'ALBUM_ROTARY';
+    const isArtistRotaryMode = () => uiMode === 'ARTIST_ROTARY';
+    const isSpineMode = () => uiMode === 'ALBUM_SPINE' || uiMode === 'ARTIST_ALBUMS_SPINE';
+    const stageEl = document.getElementById('shelf-stage');
+    const spineViewportEl = document.getElementById('shelf-viewport');
+    const cdTrackEl = document.getElementById('cd-track');
+    const wheelEl = document.getElementById('rotary-wheel');
+    const showcaseEl = document.getElementById('expanded-showcase');
+    const audioEl = document.getElementById('audio-player');
+
+    function toggleCornerMenu(forceState) {
+      isCornerMenuOpen = typeof forceState === 'boolean' ? forceState : !isCornerMenuOpen;
+      const panel = document.getElementById('corner-dropdown-panel');
+      const arrow = document.getElementById('corner-menu-arrow');
+      const dev = document.getElementById('spine-device');
+      if (panel) {
+        if (isCornerMenuOpen && dev) {
+          const availH = Math.max(160, dev.clientHeight - 66);
+          panel.style.maxHeight = `${availH}px`;
+        }
+        panel.classList.toggle('open', isCornerMenuOpen);
+      }
+      if (arrow) arrow.style.transform = isCornerMenuOpen ? 'rotate(180deg)' : 'rotate(0deg)';
+    }
+
+    function toggleBookletHeaderMenu(forceState) {
+      isBookletMenuOpen = typeof forceState === 'boolean' ? forceState : !isBookletMenuOpen;
+      const drawer = document.getElementById('booklet-menu-drawer');
+      const arrow = document.getElementById('booklet-menu-arrow');
+      if (drawer) drawer.classList.toggle('open', isBookletMenuOpen);
+      if (arrow) arrow.style.transform = isBookletMenuOpen ? 'rotate(180deg)' : 'rotate(0deg)';
+    }
+
+    document.addEventListener('click', e => {
+      if (isCornerMenuOpen && !e.target.closest('#corner-menu-anchor')) {
+        toggleCornerMenu(false);
+      }
+      if (isBookletMenuOpen && !e.target.closest('#booklet-menu-drawer') && !e.target.closest('#booklet-menu-toggle-btn')) {
+        toggleBookletHeaderMenu(false);
+      }
+    });
+
+    function showToast(msg) {
+      const toastEl = document.getElementById('status-toast');
+      if (toastEl) toastEl.textContent = msg;
+    }
+
+    function applyRealScaleMode(mode) {
+      const vp = document.getElementById('chassis-viewport');
+      const dev = document.getElementById('spine-device');
+      vp.classList.remove('padded-mode');
+      dev.classList.remove('preview-10-3', 'preview-ipad', 'real-scale-127');
+      dev.style.removeProperty('--real-w');
+      dev.style.removeProperty('--real-h');
+
+      if (mode === 'full') {
+        showToast('아이패드 / 전체화면 꽉채움 모드');
+      } else if (mode === 'ipad') {
+        vp.classList.add('padded-mode');
+        dev.classList.add('preview-ipad');
+        showToast('iPad 가로(4:3) 프레임 미리보기');
+      } else if (mode === 'fit') {
+        vp.classList.add('padded-mode');
+        dev.classList.add('preview-10-3');
+        showToast('10:3 바 디스플레이 비율 모드');
+      } else if (mode === 'real') {
+        vp.classList.add('padded-mode');
+        dev.classList.add('real-scale-127');
+        showToast('12.7인치 표준 물리 크기 (가로 30.9cm × 세로 9.27cm)');
+      } else {
+        vp.classList.add('padded-mode');
+        const inch = Number(mode);
+        const aspectW = inch === 34 ? 21 : 16;
+        const aspectH = 9;
+        const diag = Math.hypot(aspectW, aspectH);
+        const monitorWidthMm = (inch * 25.4) * (aspectW / diag);
+        const screenLogicalWidthPx = window.screen.width || window.innerWidth;
+        const pxPerMm = screenLogicalWidthPx / monitorWidthMm;
+        const targetW = Math.round(309 * pxPerMm);
+        const targetH = Math.round(92.7 * pxPerMm);
+
+        dev.style.setProperty('--real-w', `${targetW}px`);
+        dev.style.setProperty('--real-h', `${targetH}px`);
+        dev.classList.add('real-scale-127');
+        showToast(`${inch}인치 모니터 기준 1:1 실물 크기 (${targetW}×${targetH}px)`);
+      }
+      renderRotaryDrum();
+      setTimeout(resizeVisualizerCanvas, 60);
+    }
+
+    function toggleSettingsModal(show) {
+      const modal = document.getElementById('settings-modal');
+      if (show) {
+        document.getElementById('cfg-url').value = plexConfig.url;
+        document.getElementById('cfg-token').value = plexConfig.token;
+        document.getElementById('cfg-section').value = plexConfig.section;
+        modal.classList.remove('hidden');
+      } else {
+        modal.classList.add('hidden');
+      }
+    }
+
+    function saveAndConnectPlex() {
+      plexConfig = {
+        url: document.getElementById('cfg-url').value.trim().replace(/\/+$/, ''),
+        token: document.getElementById('cfg-token').value.trim(),
+        section: document.getElementById('cfg-section').value.trim() || '7'
+      };
+      try {
+        localStorage.setItem('spine_plex_local_cfg_v1', JSON.stringify(plexConfig));
+      } catch (e) {}
+      toggleSettingsModal(false);
+      loadPlexLibrary();
+    }
+
+    async function loadPlexLibrary() {
+      const badge = document.getElementById('plex-badge');
+      badge.textContent = 'SYNCING PLEX...';
+      showToast('Plex 음악 라이브러리를 불러오는 중...');
+
+      try {
+        const tokenParam = plexConfig.token ? `&X-Plex-Token=${encodeURIComponent(plexConfig.token)}` : '';
+        const endpoint = `${plexConfig.url}/library/sections/${plexConfig.section}/all?type=9${tokenParam}`;
+        const res = await fetch(endpoint, {
+          headers: { Accept: 'application/json' }
+        });
+
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        const rawList = data?.MediaContainer?.Metadata || [];
+
+        if (!rawList.length) throw new Error('앨범이 비어 있습니다');
+
+        allAlbums = rawList.map((item, idx) => {
+          const palette = SPINE_PALETTES[idx % SPINE_PALETTES.length];
+          const thumbPath = item.thumb || item.parentThumb || '';
+          const encodedThumb = thumbPath ? encodeURIComponent(thumbPath) : '';
+          const encodedToken = encodeURIComponent(plexConfig.token);
+          const thumbUrl = thumbPath
+            ? `${plexConfig.url}/photo/:/transcode?width=320&height=320&minSize=1&upscale=1&url=${encodedThumb}${encodedToken ? `&X-Plex-Token=${encodedToken}` : ''}`
+            : '';
+          const coverUrl = thumbPath
+            ? `${plexConfig.url}/photo/:/transcode?width=800&height=800&minSize=1&upscale=1&url=${encodedThumb}${encodedToken ? `&X-Plex-Token=${encodedToken}` : ''}`
+            : '';
+
+          return {
+            id: String(item.ratingKey),
+            artist: item.parentTitle || 'Unknown Artist',
+            title: item.title || 'Untitled Album',
+            year: item.year ? String(item.year) : '',
+            label: item.studio || 'CD AUDIO',
+            addedAt: Number(item.addedAt || 0),
+            palette,
+            thumbUrl,
+            coverUrl,
+            isPlex: true
+          };
+        });
+
+        badge.textContent = `PLEX LIVE • SEC ${plexConfig.section}`;
+        badge.className = 'px-2 py-0.5 rounded bg-emerald-500/20 border border-emerald-400/40 font-mono text-[10px] text-emerald-300';
+        showToast(`총 ${allAlbums.length}장의 앨범을 불러왔습니다.`);
+
+        loadPlexArtistPhotos();
+      } catch (err) {
+        const fallbackHttpUrl = 'http://192.168.0.83:32400';
+        if (plexConfig.url !== fallbackHttpUrl && plexConfig.url.includes('192-168-0-83')) {
+          try {
+            showToast('HTTPS 연결 실패, 로컬 HTTP 주소로 재시도 중...');
+            const httpEndpoint = `${fallbackHttpUrl}/library/sections/${plexConfig.section}/all?type=9${tokenParam}`;
+            const httpRes = await fetch(httpEndpoint, { headers: { Accept: 'application/json' } });
+            if (httpRes.ok) {
+              const httpData = await httpRes.json();
+              const httpList = httpData?.MediaContainer?.Metadata || [];
+              if (httpList.length) {
+                plexConfig.url = fallbackHttpUrl;
+                try { localStorage.setItem('spine_plex_local_cfg_v1', JSON.stringify(plexConfig)); } catch (e) {}
+                const encTok = encodeURIComponent(plexConfig.token);
+                allAlbums = httpList.map((item, idx) => {
+                  const palette = SPINE_PALETTES[idx % SPINE_PALETTES.length];
+                  const thumbPath = item.thumb || item.parentThumb || '';
+                  const encodedThumb = thumbPath ? encodeURIComponent(thumbPath) : '';
+                  const thumbUrl = thumbPath
+                    ? `${plexConfig.url}/photo/:/transcode?width=320&height=320&minSize=1&upscale=1&url=${encodedThumb}${encTok ? `&X-Plex-Token=${encTok}` : ''}`
+                    : '';
+                  const coverUrl = thumbPath
+                    ? `${plexConfig.url}/photo/:/transcode?width=800&height=800&minSize=1&upscale=1&url=${encodedThumb}${encTok ? `&X-Plex-Token=${encTok}` : ''}`
+                    : '';
+                  return {
+                    id: String(item.ratingKey),
+                    artist: item.parentTitle || 'Unknown Artist',
+                    title: item.title || 'Untitled Album',
+                    year: item.year ? String(item.year) : '',
+                    label: item.studio || 'CD AUDIO',
+                    addedAt: Number(item.addedAt || 0),
+                    palette,
+                    thumbUrl,
+                    coverUrl,
+                    isPlex: true
+                  };
+                });
+                badge.textContent = `PLEX LIVE • SEC ${plexConfig.section}`;
+                badge.className = 'px-2 py-0.5 rounded bg-emerald-500/20 border border-emerald-400/40 font-mono text-[10px] text-emerald-300';
+                showToast(`로컬 HTTP 연결 성공 — 총 ${allAlbums.length}장의 앨범을 불러왔습니다.`);
+                loadPlexArtistPhotos();
+                filteredAlbums = [...allAlbums];
+                buildArtistGroups();
+                buildAlphaIndex();
+                setUiMode('ALBUM_SPINE', { resetFilter: true });
+                return;
+              }
+            }
+          } catch (e2) {}
+        }
+        console.warn('Plex 연결 실패, 데모 모드로 전환:', err);
+        allAlbums = [...DEMO_ALBUMS];
+        badge.textContent = 'DEMO SHELF (OFFLINE)';
+        badge.className = 'px-2 py-0.5 rounded bg-amber-500/20 border border-amber-400/40 font-mono text-[10px] text-amber-300';
+        showToast('외부 서버 응답 대기/차단으로 기본 컬렉션을 표시합니다.');
+      }
+
+      filteredAlbums = [...allAlbums];
+      buildArtistGroups();
+      buildAlphaIndex();
+      setUiMode('ALBUM_SPINE', { resetFilter: true });
+    }
+
+    async function loadPlexArtistPhotos() {
+      try {
+        const tokenParam = plexConfig.token ? `&X-Plex-Token=${encodeURIComponent(plexConfig.token)}` : '';
+        const endpoint = `${plexConfig.url}/library/sections/${plexConfig.section}/all?type=8${tokenParam}`;
+        const res = await fetch(endpoint, { headers: { Accept: 'application/json' } });
+        if (!res.ok) return;
+        const data = await res.json();
+        const artists = data?.MediaContainer?.Metadata || [];
+        artists.forEach(a => {
+          const name = (a.title || '').trim();
+          const thumbPath = a.thumb || a.art || '';
+          if (name && thumbPath) {
+            const photoUrl = `${plexConfig.url}/photo/:/transcode?width=360&height=360&minSize=1&upscale=1&url=${encodeURIComponent(thumbPath)}${plexConfig.token ? `&X-Plex-Token=${encodeURIComponent(plexConfig.token)}` : ''}`;
+            artistPhotoMap.set(name.toLowerCase(), photoUrl);
+          }
+        });
+        buildArtistGroups();
+        if (isArtistRotaryMode()) {
+          renderArtistRotaryDrum();
+        }
+      } catch (e) {
+        console.warn('아티스트 이미지 로드 실패:', e);
+      }
+    }
+
+    function buildArtistGroups() {
+      const map = new Map();
+      allAlbums.forEach((album, idx) => {
+        const name = (album.artist || 'Unknown Artist').trim();
+        if (!map.has(name)) {
+          map.set(name, {
+            artist: name,
+            albums: [],
+            palette: SPINE_PALETTES[idx % SPINE_PALETTES.length],
+            artistPhotoUrl: artistPhotoMap.get(name.toLowerCase()) || ''
+          });
+        }
+        map.get(name).albums.push(album);
+      });
+      artistGroups = Array.from(map.values()).sort((a, b) => a.artist.localeCompare(b.artist));
+    }
+
+    function updateHeaderModeUI() {
+      const albBtn = document.getElementById('mode-albums-btn');
+      const artBtn = document.getElementById('mode-artists-btn');
+      const backBtn = document.getElementById('back-to-artists-btn');
+      const isArtistContext = uiMode === 'ARTIST_ROTARY' || uiMode === 'ARTIST_ALBUMS_SPINE';
+
+      if (isArtistContext) {
+        albBtn.className = 'py-1.5 rounded-lg text-zinc-300 hover:text-white transition';
+        artBtn.className = 'py-1.5 rounded-lg bg-amber-400 text-zinc-950 font-bold transition';
+      } else {
+        artBtn.className = 'py-1.5 rounded-lg text-zinc-300 hover:text-white transition';
+        albBtn.className = 'py-1.5 rounded-lg bg-amber-400 text-zinc-950 font-bold transition';
+      }
+
+      if (uiMode === 'ARTIST_ALBUMS_SPINE') {
+        backBtn.classList.remove('hidden');
+      } else {
+        backBtn.classList.add('hidden');
+      }
+    }
+
+    function setUiMode(nextMode, options = {}) {
+      uiMode = nextMode;
+      updateHeaderModeUI();
+
+      if (nextMode === 'ARTIST_ROTARY') {
+        if (!artistGroups.length) buildArtistGroups();
+        if (isBookletFullscreen) toggleBookletFullscreen(false);
+        showcaseEl.classList.remove('active', 'has-lyrics');
+        isLyricsOpen = false;
+        flipCard(false);
+        stageEl.classList.add('rotary-mode');
+        renderArtistRotaryDrum();
+        showToast(`아티스트 ${artistGroups.length}명 — 카드를 터치해 앨범 목록 보기`);
+        return;
+      }
+
+      if (nextMode === 'ARTIST_ALBUMS_SPINE') {
+        stageEl.classList.remove('rotary-mode');
+        if (isBookletFullscreen) toggleBookletFullscreen(false);
+        showcaseEl.classList.remove('has-lyrics');
+        isLyricsOpen = false;
+        flipCard(false);
+        renderSpines(true);
+        if (filteredAlbums.length > 0) {
+          const targetId = options.albumId || filteredAlbums[0].id;
+          previewCenterSpineAlbum(targetId, false);
+        } else {
+          showcaseEl.classList.remove('active');
+        }
+        return;
+      }
+
+      if (nextMode === 'ALBUM_SPINE') {
+        if (options.resetFilter) {
+          selectedArtistName = null;
+          const searchEl = document.getElementById('search-input');
+          if (searchEl) searchEl.value = '';
+          filteredAlbums = [...allAlbums];
+        }
+        stageEl.classList.remove('rotary-mode');
+        if (isBookletFullscreen) toggleBookletFullscreen(false);
+        showcaseEl.classList.remove('has-lyrics');
+        isLyricsOpen = false;
+        flipCard(false);
+        renderSpines(true);
+        if (filteredAlbums.length > 0) {
+          const targetId = options.albumId || selectedId || filteredAlbums[0].id;
+          const validTarget = filteredAlbums.some(a => a.id === targetId) ? targetId : filteredAlbums[0].id;
+          previewCenterSpineAlbum(validTarget, Boolean(options.smooth));
+        } else {
+          showcaseEl.classList.remove('active');
+        }
+        return;
+      }
+
+      if (nextMode === 'ALBUM_ROTARY') {
+        stageEl.classList.add('rotary-mode');
+        updateSpineCenterSplit();
+        renderRotaryDrum();
+      }
+    }
+
+    function setBrowseMode(mode) {
+      if (mode === 'artists') {
+        artistRotaryIndex = 0;
+        setUiMode('ARTIST_ROTARY');
+      } else {
+        setUiMode('ALBUM_SPINE', { resetFilter: true, smooth: true });
+      }
+    }
+
+    function openArtistRotaryPicker() {
+      setUiMode('ARTIST_ROTARY');
+    }
+
+    function backToArtistRotary() {
+      setUiMode('ARTIST_ROTARY');
+    }
+
+    function selectArtistFromRotary(artistName) {
+      const group = artistGroups.find(g => g.artist === artistName);
+      if (!group) return;
+      selectedArtistName = artistName;
+      const searchEl = document.getElementById('search-input');
+      if (searchEl) searchEl.value = '';
+
+      filteredAlbums = [...group.albums].sort((a, b) => (Number(a.year) || 0) - (Number(b.year) || 0));
+      rotaryIndex = 0;
+      selectedId = filteredAlbums[0] ? filteredAlbums[0].id : null;
+
+      setUiMode('ARTIST_ALBUMS_SPINE', { albumId: selectedId });
+      showToast(`${artistName} — 총 ${filteredAlbums.length}장의 앨범`);
+    }
+
+    const ROTARY_POOL_SIZE = 15; // visibleHalf(7) * 2 + 1
+    let rotaryPoolNodes = [];
+
+    function ensureRotaryPool() {
+      if (rotaryPoolNodes.length === ROTARY_POOL_SIZE) return;
+      wheelEl.innerHTML = '';
+      rotaryPoolNodes = Array.from({ length: ROTARY_POOL_SIZE }, () => {
+        const slot = document.createElement('div');
+        slot.className = 'rotary-slot';
+        slot.innerHTML = `
+          <div class="slot-jewel-edge"><span></span></div>
+          <img alt="" loading="lazy" class="slot-img hidden" />
+          <div class="slot-fallback w-full h-full"></div>
+          <div class="slot-artist-caption hidden absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black/95 via-black/75 to-transparent pointer-events-none">
+            <div class="cap-count font-mono text-[10px] text-amber-400 font-bold tracking-wider"></div>
+            <div class="cap-name text-sm font-extrabold text-white truncate"></div>
+          </div>
+        `;
+        const img = slot.querySelector('.slot-img');
+        const fb = slot.querySelector('.slot-fallback');
+        img.onerror = () => {
+          img.classList.add('hidden');
+          fb.classList.remove('hidden');
+        };
+        slot.addEventListener('click', e => {
+          e.stopPropagation();
+          const mode = slot.dataset.slotMode;
+          if (mode === 'artist') {
+            handleArtistSlotClick(Number(slot.dataset.virtualPos), slot.dataset.artist);
+          } else if (mode === 'album' && slot.dataset.id) {
+            selectAlbum(slot.dataset.id, true);
+          }
+        });
+        wheelEl.appendChild(slot);
+        return slot;
+      });
+    }
+
+    function renderArtistRotaryDrum() {
+      const q = (document.getElementById('search-input')?.value || '').trim().toLowerCase();
+      const list = q ? artistGroups.filter(g => g.artist.toLowerCase().includes(q)) : artistGroups;
+      document.getElementById('album-counter').textContent = `${list.length} ARTISTS`;
+      const total = list.length;
+      if (!total) {
+        rotaryPoolNodes.forEach(n => { n.style.display = 'none'; });
+        return;
+      }
+
+      ensureRotaryPool();
+      const stageW = stageEl.clientWidth || window.innerWidth;
+      const radiusX = Math.min(stageW * 0.44, 520);
+      const radiusZ = Math.min(stageW * 0.34, 420);
+      const visibleHalf = Math.min(7, Math.floor((total - 1) / 2));
+      const centerRound = Math.round(artistRotaryIndex);
+
+      rotaryPoolNodes.forEach((slot, poolIdx) => {
+        const offset = poolIdx - 7;
+        if (offset < -visibleHalf || offset > visibleHalf) {
+          slot.style.display = 'none';
+          return;
+        }
+
+        const virtualPos = centerRound + offset;
+        const realIdx = ((virtualPos % total) + total) % total;
+        const grp = list[realIdx];
+        const rel = virtualPos - artistRotaryIndex;
+        const isCenter = Math.abs(rel) < 0.35;
+
+        const angleRad = rel * 0.31;
+        const sinA = Math.sin(angleRad);
+        const cosA = Math.cos(angleRad);
+
+        const translateX = sinA * radiusX;
+        const translateZ = (cosA - 1) * radiusZ;
+        const rotateY = -sinA * 56;
+        const scale = Math.max(0.64, 1 - Math.abs(rel) * 0.055);
+        const opacity = Math.max(0.24, 1 - Math.abs(rel) * 0.13);
+        const brightness = Math.max(0.45, 1 - Math.abs(rel) * 0.11);
+
+        slot.style.display = 'block';
+        slot.classList.toggle('ring-2', isCenter);
+        slot.classList.toggle('ring-amber-400', isCenter);
+        slot.dataset.slotMode = 'artist';
+        slot.dataset.virtualPos = String(virtualPos);
+        slot.dataset.artist = grp.artist;
+        slot.title = `${grp.artist} (${grp.albums.length} Albums)`;
+        slot.style.transform = `translate3d(${translateX.toFixed(1)}px, 0px, ${translateZ.toFixed(1)}px) rotateY(${rotateY.toFixed(1)}deg) scale(${scale.toFixed(3)})`;
+        slot.style.opacity = opacity.toFixed(2);
+        slot.style.pointerEvents = 'auto';
+        slot.style.filter = `brightness(${brightness.toFixed(2)})`;
+        slot.style.zIndex = String(20 - Math.round(Math.abs(rel)));
+
+        slot.querySelector('.slot-jewel-edge').classList.add('hidden');
+        const cap = slot.querySelector('.slot-artist-caption');
+        cap.classList.remove('hidden');
+        cap.querySelector('.cap-count').textContent = `${grp.albums.length} ALBUMS`;
+        cap.querySelector('.cap-name').textContent = grp.artist;
+
+        const img = slot.querySelector('.slot-img');
+        const fb = slot.querySelector('.slot-fallback');
+        const fbKey = `artist:${grp.artist}`;
+        if (fb.dataset.cacheKey !== fbKey) {
+          fb.dataset.cacheKey = fbKey;
+          const initials = grp.artist
+            .split(/\s+/)
+            .slice(0, 2)
+            .map(w => w.charAt(0).toUpperCase())
+            .join('');
+          fb.innerHTML = `
+            <div class="w-full h-full flex flex-col items-center justify-center p-4" style="background: radial-gradient(circle at 35% 30%, ${grp.palette.bg}, #09090d); color:${grp.palette.fg};">
+              <div class="w-24 h-24 rounded-full border-2 border-white/25 bg-black/35 flex items-center justify-center text-3xl font-black tracking-wider shadow-xl mb-3">
+                ${escapeHtml(initials || '♪')}
+              </div>
+              <span class="font-mono text-[10px] uppercase tracking-widest opacity-65">ARTIST PROFILE</span>
+            </div>
+          `;
+        }
+
+        if (grp.artistPhotoUrl) {
+          img.className = 'slot-img w-full h-full object-cover object-top';
+          if (img.dataset.src !== grp.artistPhotoUrl) {
+            img.dataset.src = grp.artistPhotoUrl;
+            img.src = grp.artistPhotoUrl;
+          }
+          img.classList.remove('hidden');
+          fb.classList.add('hidden');
+        } else {
+          img.classList.add('hidden');
+          fb.classList.remove('hidden');
+        }
+      });
+    }
+
+    function handleArtistSlotClick(virtualPos, artistName) {
+      if (Math.abs(virtualPos - artistRotaryIndex) > 0.35) {
+        artistRotaryIndex = virtualPos;
+        renderArtistRotaryDrum();
+      } else {
+        selectArtistFromRotary(artistName);
+      }
+    }
+
+    function buildAlphaIndex() {
+      const container = document.getElementById('alpha-index');
+      if (!container) return;
+      const letters = ['#', 'A', 'C', 'E', 'G', 'J', 'L', 'M', 'P', 'R', 'S', 'T', 'W', 'ㄱ', 'ㅅ', 'ㅇ'];
+      container.innerHTML = letters
+        .map(ch => `<button onclick="jumpToLetter('${ch}')" class="px-1.5 py-0.5 rounded hover:bg-white/10 hover:text-amber-300 transition">${ch}</button>`)
+        .join('');
+    }
+
+    function jumpToLetter(ch) {
+      toggleCornerMenu(false);
+      if (isArtistRotaryMode()) {
+        const idx = artistGroups.findIndex(g => {
+          const first = (g.artist || '').trim().charAt(0).toUpperCase();
+          return ch === '#' ? /[0-9]/.test(first) : first >= ch;
+        });
+        if (idx !== -1) {
+          artistRotaryIndex = idx;
+          renderArtistRotaryDrum();
+        }
+        return;
+      }
+      const target = filteredAlbums.find(a => {
+        const first = (a.artist || '').trim().charAt(0).toUpperCase();
+        if (ch === '#') return /[0-9]/.test(first);
+        return first >= ch;
+      });
+      if (target) {
+        if (isExpandedMode()) {
+          selectAlbum(target.id, true);
+        } else {
+          previewCenterSpineAlbum(target.id, true);
+        }
+      }
+    }
+
+    function handleSearch(query) {
+      if (isArtistRotaryMode()) {
+        artistRotaryIndex = 0;
+        renderArtistRotaryDrum();
+        return;
+      }
+      const q = query.trim().toLowerCase();
+      const basePool = selectedArtistName
+        ? (artistGroups.find(g => g.artist === selectedArtistName)?.albums || [])
+        : allAlbums;
+      filteredAlbums = q
+        ? basePool.filter(a => a.artist.toLowerCase().includes(q) || a.title.toLowerCase().includes(q))
+        : [...basePool];
+      rotaryIndex = 0;
+      renderSpines(true);
+      renderRotaryDrum();
+      if (isSpineMode() && filteredAlbums.length > 0) {
+        previewCenterSpineAlbum(filteredAlbums[0].id, false);
+      }
+    }
+
+    function handleSort(mode) {
+      if (mode === 'artist') {
+        filteredAlbums.sort((a, b) => a.artist.localeCompare(b.artist));
+      } else if (mode === 'recent') {
+        filteredAlbums.sort((a, b) => b.addedAt - a.addedAt);
+      } else if (mode === 'year') {
+        filteredAlbums.sort((a, b) => (Number(b.year) || 0) - (Number(a.year) || 0));
+      } else if (mode === 'random') {
+        filteredAlbums.sort(() => Math.random() - 0.5);
+      }
+      rotaryIndex = 0;
+      renderSpines(true);
+      renderRotaryDrum();
+      if (filteredAlbums.length > 0) {
+        if (isExpandedMode()) {
+          selectAlbum(filteredAlbums[0].id, true);
+        } else {
+          previewCenterSpineAlbum(filteredAlbums[0].id, true);
+        }
+      }
+    }
+
+    const SPINE_STEP = 38; // width(34px) + gap(4px)
+    let renderedSpineRange = { start: -1, end: -1 };
+
+    function renderSpines(force = false) {
+      if (!cdTrackEl || !spineViewportEl) return;
+      const total = filteredAlbums.length;
+      if (!total) {
+        cdTrackEl.innerHTML = '';
+        renderedSpineRange = { start: -1, end: -1 };
+        return;
+      }
+
+      const vpW = spineViewportEl.clientWidth || window.innerWidth;
+      const padLeft = vpW * 0.46;
+      const scrollLeft = spineViewportEl.scrollLeft;
+      const buffer = 35;
+
+      const firstVisible = Math.max(0, Math.floor((scrollLeft - padLeft) / SPINE_STEP) - buffer);
+      const lastVisible = Math.min(total - 1, Math.ceil((scrollLeft + vpW - padLeft) / SPINE_STEP) + buffer);
+
+      if (!force && firstVisible === renderedSpineRange.start && lastVisible === renderedSpineRange.end) {
+        updateSpineCenterSplit();
+        return;
+      }
+      renderedSpineRange = { start: firstVisible, end: lastVisible };
+
+      const leftSpacerW = firstVisible * SPINE_STEP;
+      const rightSpacerW = Math.max(0, (total - 1 - lastVisible) * SPINE_STEP);
+      const gap = isSpineMode() && selectedId ? getSpineCenterGap() : 0;
+
+      let out = `<div style="width:${leftSpacerW}px; flex-shrink:0;"></div>`;
+      for (let i = firstVisible; i <= lastVisible; i++) {
+        const album = filteredAlbums[i];
+        const isSel = album.id === selectedId;
+        const marginStyle = isSel && isSpineMode() ? `margin-left:${gap}px; margin-right:${gap}px;` : '';
+        out += `
+          <div
+            class="cd-spine ${isSel ? 'selected' : ''}"
+            data-id="${album.id}"
+            style="background:${album.palette.bg}; color:${album.palette.fg}; ${marginStyle}"
+            onclick="handleSpineClick(event, '${album.id}')"
+            title="${escapeHtml(album.artist)} — ${escapeHtml(album.title)}"
+          >
+            <div class="jewel-teeth"></div>
+            <div class="acrylic-sheen"></div>
+            <div class="spine-top-tag">${escapeHtml(album.year || 'CD')}</div>
+            <div class="spine-title-wrap">
+              <span class="spine-artist">${escapeHtml(album.artist)}</span>
+              <span class="spine-sep">•</span>
+              <span class="spine-album">${escapeHtml(album.title)}</span>
+            </div>
+            <div class="spine-bottom-logo">COMPACT DISC</div>
+          </div>
+        `;
+      }
+      out += `<div style="width:${rightSpacerW}px; flex-shrink:0;"></div>`;
+      cdTrackEl.innerHTML = out;
+    }
+
+    let spineMoved = false;
+
+    function handleSpineClick(e, id) {
+      e.stopPropagation();
+      if (spineMoved) {
+        spineMoved = false;
+        return;
+      }
+      if (selectedId === id && isSpineMode()) {
+        selectAlbum(id, true, true, true);
+      } else {
+        previewCenterSpineAlbum(id, true);
+      }
+    }
+
+    function getSpineCenterGap() {
+      const stageH = stageEl.clientHeight || window.innerHeight;
+      const stageW = stageEl.clientWidth || window.innerWidth;
+      const cardSize = Math.min(stageH * 0.86, stageW * 0.76);
+      return Math.round(cardSize / 2) + 8;
+    }
+
+    function updateSpineCenterSplit() {
+      if (!cdTrackEl) return;
+      const gap = isSpineMode() && selectedId ? getSpineCenterGap() : 0;
+      cdTrackEl.querySelectorAll('.cd-spine').forEach(el => {
+        const isSel = el.dataset.id === selectedId;
+        el.classList.toggle('selected', isSel);
+        if (isSel && isSpineMode()) {
+          el.style.marginLeft = `${gap}px`;
+          el.style.marginRight = `${gap}px`;
+        } else {
+          el.style.marginLeft = '0px';
+          el.style.marginRight = '0px';
+        }
+      });
+    }
+
+
+    function highlightSpineOnly(id, smooth = true) {
+      const idx = filteredAlbums.findIndex(a => a.id === id);
+      if (idx === -1 || !cdTrackEl || !spineViewportEl) return;
+      selectedId = id;
+      const gap = isSpineMode() ? getSpineCenterGap() : 0;
+      const padLeft = spineViewportEl.clientWidth * 0.46;
+      const targetCenter = padLeft + idx * SPINE_STEP + gap + 17;
+      const targetLeft = Math.max(0, targetCenter - spineViewportEl.clientWidth / 2);
+      isProgrammaticSpineScroll = true;
+      spineViewportEl.scrollTo({
+        left: targetLeft,
+        behavior: smooth ? 'smooth' : 'auto'
+      });
+      renderSpines(true);
+      setTimeout(() => {
+        isProgrammaticSpineScroll = false;
+        renderSpines(true);
+      }, 380);
+    }
+
+    function previewCenterSpineAlbum(id, smooth = true) {
+      const idx = filteredAlbums.findIndex(a => a.id === id);
+      if (idx === -1) return;
+      const album = filteredAlbums[idx];
+
+      selectedId = id;
+      rotaryIndex = idx;
+      currentTracks = [];
+      currentTrackIdx = -1;
+      highlightSpineOnly(id, smooth);
+
+      document.getElementById('sc-artist').textContent = album.artist;
+      document.getElementById('sc-title').textContent = album.title;
+      document.getElementById('sc-meta').textContent = `${album.year || 'AUDIO'} • ${album.label}`;
+
+      document.getElementById('fb-label').textContent = album.label;
+      document.getElementById('fb-artist').textContent = album.artist;
+      document.getElementById('fb-title').textContent = album.title;
+
+      const imgEl = document.getElementById('showcase-cover-img');
+      const fbEl = document.getElementById('showcase-cover-fallback');
+      if (album.coverUrl) {
+        fbEl.classList.add('hidden');
+        imgEl.classList.remove('hidden');
+        imgEl.src = album.coverUrl;
+      } else {
+        imgEl.removeAttribute('src');
+        handleCoverFallback();
+      }
+
+      flipCard(false);
+      showcaseEl.classList.add('active');
+    }
+
+    function renderRotaryDrum() {
+      document.getElementById('album-counter').textContent = `${filteredAlbums.length} ALBUMS`;
+      const total = filteredAlbums.length;
+      if (!total) {
+        rotaryPoolNodes.forEach(n => { n.style.display = 'none'; });
+        return;
+      }
+
+      ensureRotaryPool();
+      const stageW = stageEl.clientWidth || window.innerWidth;
+      const radiusX = Math.min(stageW * 0.44, 520);
+      const radiusZ = Math.min(stageW * 0.34, 420);
+      const visibleHalf = Math.min(7, Math.floor((total - 1) / 2));
+      const centerRound = Math.round(rotaryIndex);
+
+      rotaryPoolNodes.forEach((slot, poolIdx) => {
+        const offset = poolIdx - 7;
+        if (offset < -visibleHalf || offset > visibleHalf) {
+          slot.style.display = 'none';
+          return;
+        }
+
+        const virtualPos = centerRound + offset;
+        const realIdx = ((virtualPos % total) + total) % total;
+        const album = filteredAlbums[realIdx];
+        const rel = virtualPos - rotaryIndex;
+
+        const spreadBonus = isExpandedMode() ? (isLyricsOpen ? 235 : 125) : 0;
+        const angleRad = rel * 0.31;
+        const sinA = Math.sin(angleRad);
+        const cosA = Math.cos(angleRad);
+
+        const translateX = sinA * radiusX + (rel === 0 ? 0 : Math.sign(rel) * spreadBonus * Math.min(1, Math.abs(rel)));
+        const translateZ = (cosA - 1) * radiusZ - (isExpandedMode() ? 140 : 0);
+        const rotateY = -sinA * 56;
+        const scale = Math.max(0.64, 1 - Math.abs(rel) * 0.055);
+        const isHiddenCenter = isExpandedMode() && Math.abs(rel) < 0.45;
+        const disableSlotPointer = isHiddenCenter || (isExpandedMode() && isLyricsOpen);
+        const opacity = isHiddenCenter ? 0 : Math.max(0.22, 1 - Math.abs(rel) * 0.13);
+        const brightness = Math.max(0.45, 1 - Math.abs(rel) * 0.11);
+
+        slot.style.display = 'block';
+        slot.classList.remove('ring-2', 'ring-amber-400');
+        slot.dataset.slotMode = 'album';
+        slot.dataset.id = album.id;
+        slot.title = `${album.artist} — ${album.title}`;
+        slot.style.transform = `translate3d(${translateX.toFixed(1)}px, 0px, ${translateZ.toFixed(1)}px) rotateY(${rotateY.toFixed(1)}deg) scale(${scale.toFixed(3)})`;
+        slot.style.opacity = opacity.toFixed(2);
+        slot.style.pointerEvents = disableSlotPointer ? 'none' : 'auto';
+        slot.style.filter = `brightness(${brightness.toFixed(2)})`;
+        slot.style.zIndex = String(20 - Math.round(Math.abs(rel)));
+
+        const jewelEdge = slot.querySelector('.slot-jewel-edge');
+        jewelEdge.classList.remove('hidden');
+        jewelEdge.firstElementChild.textContent = album.artist;
+        slot.querySelector('.slot-artist-caption').classList.add('hidden');
+
+        const img = slot.querySelector('.slot-img');
+        const fb = slot.querySelector('.slot-fallback');
+        const fbKey = `album:${album.id}`;
+        if (fb.dataset.cacheKey !== fbKey) {
+          fb.dataset.cacheKey = fbKey;
+          fb.innerHTML = `<div class="w-full h-full flex flex-col justify-between p-4 pl-6" style="background:${album.palette.bg}; color:${album.palette.fg};">
+            <span class="font-mono text-[10px] opacity-70">${escapeHtml(album.year || 'CD')}</span>
+            <div>
+              <div class="text-xs font-bold opacity-85 truncate">${escapeHtml(album.artist)}</div>
+              <div class="text-sm font-extrabold leading-tight line-clamp-2 mt-1">${escapeHtml(album.title)}</div>
+            </div>
+          </div>`;
+        }
+
+        const slotArtUrl = album.thumbUrl || album.coverUrl;
+        if (slotArtUrl) {
+          img.className = 'slot-img';
+          if (img.dataset.src !== slotArtUrl) {
+            img.dataset.src = slotArtUrl;
+            img.src = slotArtUrl;
+          }
+          img.classList.remove('hidden');
+          fb.classList.add('hidden');
+        } else {
+          img.classList.add('hidden');
+          fb.classList.remove('hidden');
+        }
+      });
+    }
+
+    function stepRotary(delta) {
+      if (isArtistRotaryMode()) {
+        if (!artistGroups.length) return;
+        artistRotaryIndex = Math.round(artistRotaryIndex) + delta;
+        renderArtistRotaryDrum();
+        return;
+      }
+      if (!filteredAlbums.length) return;
+      const total = filteredAlbums.length;
+      const targetPos = Math.round(rotaryIndex) + delta;
+      const targetIdx = ((targetPos % total) + total) % total;
+      rotaryIndex = targetPos;
+      selectAlbum(filteredAlbums[targetIdx].id, true, false, false);
+    }
+
+    function flipCard(toBack) {
+      const cardEl = document.getElementById('showcase-card');
+      if (!cardEl) return;
+      cardEl.classList.toggle('flipped', Boolean(toBack));
+    }
+
+    async function handleFrontCoverClick() {
+      if (!selectedId) return;
+      const album = filteredAlbums.find(a => a.id === selectedId);
+      if (!album) return;
+
+      if (!isExpandedMode()) {
+        await selectAlbum(selectedId, true, true, true);
+      } else {
+        flipCard(true);
+        if (!currentTracks.length) {
+          await fetchAlbumTracks(album);
+        }
+      }
+    }
+
+    function toggleLyricsBooklet(forceState) {
+      isLyricsOpen = typeof forceState === 'boolean' ? forceState : !isLyricsOpen;
+      if (!isLyricsOpen) {
+        if (isBookletMenuOpen) toggleBookletHeaderMenu(false);
+        if (isBookletFullscreen) toggleBookletFullscreen(false);
+      }
+      showcaseEl.classList.toggle('has-lyrics', isLyricsOpen);
+      renderRotaryDrum();
+      if (isLyricsOpen && bookletViewMode !== 'lyrics') {
+        initWebAudioAnalyser();
+        startVisualizerLoop();
+        setTimeout(resizeVisualizerCanvas, 60);
+        setTimeout(resizeVisualizerCanvas, 400);
+      } else {
+        stopVisualizerLoop();
+      }
+    }
+
+    function toggleBookletFullscreen(forceState) {
+      isBookletFullscreen = typeof forceState === 'boolean' ? forceState : !isBookletFullscreen;
+      const bookletEl = document.getElementById('lyrics-booklet');
+      const deviceEl = document.getElementById('spine-device');
+      const showcaseContainer = document.getElementById('expanded-showcase');
+      const fsBtn = document.getElementById('booklet-fullscreen-btn');
+      if (bookletEl) {
+        if (isBookletFullscreen && deviceEl) {
+          deviceEl.appendChild(bookletEl);
+        } else if (!isBookletFullscreen && showcaseContainer && bookletEl.parentElement !== showcaseContainer) {
+          showcaseContainer.appendChild(bookletEl);
+        }
+        bookletEl.classList.toggle('visualizer-fullscreen', isBookletFullscreen);
+      }
+      if (fsBtn) {
+        fsBtn.textContent = isBookletFullscreen ? '🗗' : '⛶';
+        fsBtn.title = isBookletFullscreen ? '원래 크기로 복원 (ESC)' : '비주얼라이저 전체화면 전환';
+      }
+      setTimeout(resizeVisualizerCanvas, 30);
+    }
+
+    // 우측 CD 부클릿 뷰 모드 전환 ('lyrics' | 'scope' | 'vu' | 'aurora' | 'disc')
+    // 우측 CD 부클릿 뷰 모드 전환
+    function setBookletViewMode(mode) {
+      bookletViewMode = mode;
+      const lyricsBox = document.getElementById('lyrics-lines-box');
+      const vizBox = document.getElementById('booklet-visualizer-box');
+      const syncControls = document.getElementById('lyrics-sync-controls');
+      const fsBtn = document.getElementById('booklet-fullscreen-btn');
+      const badge = document.getElementById('lyrics-sync-badge');
+
+      const allModes = ['lyrics', 'scope', 'vu', 'aurora', 'disc', 'reel', 'tube', 'phase', 'matrix', 'ripple'];
+      const activeBtnClass = 'py-1 rounded-md font-mono text-[9px] font-bold bg-amber-400 text-zinc-950 transition';
+      const inactiveBtnClass = 'py-1 rounded-md font-mono text-[9px] font-bold text-zinc-300 hover:text-white transition';
+
+      allModes.forEach(m => {
+        const btn = document.getElementById(`booklet-mode-${m}`);
+        if (btn) btn.className = mode === m ? activeBtnClass : inactiveBtnClass;
+      });
+
+      if (mode === 'lyrics') {
+        stopVisualizerLoop();
+        if (isBookletFullscreen) toggleBookletFullscreen(false);
+        if (fsBtn) fsBtn.classList.add('hidden');
+        if (lyricsBox) lyricsBox.classList.remove('hidden');
+        if (vizBox) vizBox.classList.add('hidden');
+        if (syncControls) syncControls.classList.remove('hidden');
+        if (badge) badge.textContent = 'LYRICS';
+      } else {
+        if (fsBtn) fsBtn.classList.remove('hidden');
+        if (lyricsBox) lyricsBox.classList.add('hidden');
+        if (vizBox) vizBox.classList.remove('hidden');
+        if (syncControls) syncControls.classList.add('hidden');
+        const badgeLabels = {
+          scope: 'SCOPE',
+          vu: 'VU METER',
+          aurora: 'AURORA',
+          disc: 'DISC',
+          reel: 'REEL DECK',
+          tube: 'VACUUM TUBE',
+          phase: 'LISSAJOUS',
+          matrix: 'LED MATRIX',
+          ripple: 'RIPPLE'
+        };
+        if (badge) badge.textContent = badgeLabels[mode] || 'VISUALIZER';
+        initWebAudioAnalyser();
+        resizeVisualizerCanvas();
+        if (isLyricsOpen) startVisualizerLoop();
+      }
+      toggleBookletHeaderMenu(false);
+    }
+
+    function shiftLyricsOffset(delta) {
+      lyricsOffset = Number((lyricsOffset + delta).toFixed(1));
+      showToast(`가사 싱크 조절: ${lyricsOffset > 0 ? '+' : ''}${lyricsOffset}초`);
+    }
+
+    function handleCoverFallback() {
+      const imgEl = document.getElementById('showcase-cover-img');
+      const fbEl = document.getElementById('showcase-cover-fallback');
+      if (imgEl) imgEl.classList.add('hidden');
+      if (fbEl) fbEl.classList.remove('hidden');
+    }
+
+    const coverImgNode = document.getElementById('showcase-cover-img');
+    if (coverImgNode) {
+      coverImgNode.addEventListener('error', () => {
+        if (coverImgNode.getAttribute('src')) {
+          handleCoverFallback();
+        }
+      });
+    }
+
+    function collapseShowcase() {
+      const returnMode = selectedArtistName ? 'ARTIST_ALBUMS_SPINE' : 'ALBUM_SPINE';
+      setUiMode(returnMode, { albumId: selectedId, smooth: true });
+    }
+
+    function enterRotaryMode(id) {
+      selectAlbum(id || selectedId, true, true, true);
+    }
+
+    async function selectAlbum(id, smooth = true, alignRotary = true, openBack = false) {
+      const idx = filteredAlbums.findIndex(a => a.id === id);
+      if (idx === -1) return;
+      const album = filteredAlbums[idx];
+
+      if (!isExpandedMode()) {
+        rotaryIndex = idx;
+      } else if (alignRotary && filteredAlbums.length > 0) {
+        const total = filteredAlbums.length;
+        const curMod = ((Math.round(rotaryIndex) % total) + total) % total;
+        let diff = idx - curMod;
+        if (diff > total / 2) diff -= total;
+        if (diff < -total / 2) diff += total;
+        rotaryIndex = Math.round(rotaryIndex) + diff;
+      }
+
+      selectedId = id;
+      uiMode = 'ALBUM_ROTARY';
+      updateHeaderModeUI();
+      stageEl.classList.add('rotary-mode');
+      updateSpineCenterSplit();
+      flipCard(openBack);
+      renderRotaryDrum();
+
+      document.getElementById('sc-artist').textContent = album.artist;
+      document.getElementById('sc-title').textContent = album.title;
+      document.getElementById('sc-meta').textContent = `${album.year || 'AUDIO'} • ${album.label}`;
+
+      document.getElementById('fb-label').textContent = album.label;
+      document.getElementById('fb-artist').textContent = album.artist;
+      document.getElementById('fb-title').textContent = album.title;
+
+      const imgEl = document.getElementById('showcase-cover-img');
+      const fbEl = document.getElementById('showcase-cover-fallback');
+      if (album.coverUrl) {
+        fbEl.classList.add('hidden');
+        imgEl.classList.remove('hidden');
+        imgEl.src = album.coverUrl;
+      } else {
+        imgEl.removeAttribute('src');
+        handleCoverFallback();
+      }
+
+      showcaseEl.classList.add('active');
+      await fetchAlbumTracks(album);
+    }
+
+    async function fetchAlbumTracks(album) {
+      const tracksContainer = document.getElementById('sc-tracks');
+      tracksContainer.innerHTML = `<div class="text-xs text-zinc-400 py-4 text-center">트랙 목록 불러오는 중...</div>`;
+
+      if (album.isPlex) {
+        try {
+          const url = `${plexConfig.url}/library/metadata/${album.id}/children${plexConfig.token ? `?X-Plex-Token=${encodeURIComponent(plexConfig.token)}` : ''}`;
+          const res = await fetch(url, { headers: { Accept: 'application/json' } });
+          if (!res.ok) throw new Error('트랙 조회 실패');
+          const data = await res.json();
+          const items = data?.MediaContainer?.Metadata || [];
+
+          currentTracks = items.map((t, i) => {
+            const part = t?.Media?.[0]?.Part?.[0];
+            const partKey = part?.key || '';
+            const streams = part?.Stream || [];
+            const lyricStream = streams.find(s => String(s.streamType) === '4' || s.codec === 'lrc' || s.codec === 'txt');
+            return {
+              index: t.index || i + 1,
+              title: t.title || `Track ${i + 1}`,
+              artist: t.grandparentTitle || album.artist,
+              durationMs: t.duration || 0,
+              duration: formatDuration(t.duration || 0),
+              streamUrl: partKey ? `${plexConfig.url}${partKey}${plexConfig.token ? `?X-Plex-Token=${encodeURIComponent(plexConfig.token)}` : ''}` : '',
+              lyricUrl: lyricStream?.key ? `${plexConfig.url}${lyricStream.key}${plexConfig.token ? `?X-Plex-Token=${encodeURIComponent(plexConfig.token)}` : ''}` : ''
+            };
+          });
+          renderTracks();
+          return;
+        } catch (e) {
+          console.warn('트랙 로드 실패:', e);
+        }
+      }
+
+      currentTracks = [
+        { index: 1, title: 'Opening Theme (Remastered)', artist: album.artist, durationMs: 222000, duration: '3:42', streamUrl: '', demoLyrics: '[00:04.00] Opening theme begins\n[00:10.00] Spinning the rotary jukebox' },
+        { index: 2, title: 'Midnight Groove', artist: album.artist, durationMs: 258000, duration: '4:18', streamUrl: '', demoLyrics: '[00:05.00] Midnight groove on the turntable' },
+        { index: 3, title: 'Analog Memories', artist: album.artist, durationMs: 235000, duration: '3:55', streamUrl: '', demoLyrics: '[00:05.00] Warm analog sound' }
+      ];
+      renderTracks();
+    }
+
+    function renderTracks() {
+      const tracksContainer = document.getElementById('sc-tracks');
+      tracksContainer.innerHTML = currentTracks
+        .map((tr, idx) => {
+          const active = idx === currentTrackIdx;
+          return `
+            <div
+              onclick="playTrack(${idx})"
+              class="flex items-center justify-between px-3 py-2.5 rounded-xl cursor-pointer transition ${
+                active
+                  ? 'bg-amber-400/20 border border-amber-400/40 text-amber-300'
+                  : 'hover:bg-white/10 active:bg-white/15 text-zinc-200'
+              }"
+            >
+              <div class="flex items-center gap-2.5 min-w-0">
+                <span class="font-mono text-xs w-5 text-zinc-400">${tr.index}</span>
+                <span class="text-sm font-medium truncate">${escapeHtml(tr.title)}</span>
+              </div>
+              <span class="font-mono text-xs text-zinc-400 ml-2">${tr.duration}</span>
+            </div>
+          `;
+        })
+        .join('');
+    }
+
+    function playTrack(idx) {
+      const tr = currentTracks[idx];
+      if (!tr) return;
+      currentTrackIdx = idx;
+      renderTracks();
+
+      flipCard(false);
+      const playingBar = document.getElementById('cover-playing-bar');
+      if (playingBar) playingBar.classList.add('visible');
+      const lyricsPlayingBar = document.getElementById('lyrics-playing-bar');
+      if (lyricsPlayingBar) lyricsPlayingBar.classList.add('visible');
+
+      const activeAlbum = filteredAlbums.find(a => a.id === selectedId);
+      const titleText = `${tr.index}. ${tr.title}`;
+      const artistText = activeAlbum ? `${activeAlbum.artist} — ${activeAlbum.title}` : '';
+      document.getElementById('now-playing-title').textContent = titleText;
+      document.getElementById('now-playing-artist').textContent = artistText;
+      document.getElementById('lyrics-now-playing-title').textContent = titleText;
+      document.getElementById('lyrics-now-playing-artist').textContent = artistText;
+
+      document.getElementById('lyrics-track-name').textContent = tr.title;
+      toggleLyricsBooklet(true);
+      lyricsOffset = 0;
+      loadTrackLyrics(activeAlbum, tr);
+
+      if (tr.streamUrl) {
+        zeroSignalFrames = 0;
+        forceSynthVisualizer = false;
+        initWebAudioAnalyser();
+        audioEl.crossOrigin = 'anonymous';
+        audioEl.src = tr.streamUrl;
+        audioEl.play().catch(err => {
+          if (audioEl.crossOrigin) {
+            audioEl.removeAttribute('crossorigin');
+            audioEl.src = tr.streamUrl;
+            audioEl.play().catch(() => showToast('브라우저 자동 재생 정책으로 재생 버튼을 눌러주세요.'));
+          } else {
+            showToast('브라우저 자동 재생 정책으로 재생 버튼을 눌러주세요.');
+          }
+        });
+        document.getElementById('play-pause-btn').textContent = '⏸';
+        document.getElementById('lyrics-play-pause-btn').textContent = '⏸';
+      } else {
+        showToast(`데모 트랙 선택됨: ${tr.title}`);
+      }
+    }
+
+    async function loadTrackLyrics(album, tr) {
+      const box = document.getElementById('lyrics-lines-box');
+      const badge = document.getElementById('lyrics-sync-badge');
+      box.innerHTML = '<div class="text-xs text-zinc-400 text-center py-10">가사 불러오는 중...</div>';
+      parsedLyrics = [];
+
+      let rawText = tr.demoLyrics || '';
+      if (!rawText && tr.lyricUrl) {
+        try {
+          const res = await fetch(tr.lyricUrl);
+          if (res.ok) rawText = await res.text();
+        } catch (e) {}
+      }
+
+      if (!/\[\d{1,2}:\d{2}/.test(rawText)) {
+        try {
+          const cleanTitle = tr.title.replace(/\s*[\(\[].*?[\)\]]/g, '').trim();
+          const artistQ = encodeURIComponent(tr.artist || album?.artist || '');
+          const titleQ = encodeURIComponent(cleanTitle);
+          const lrcRes = await fetch(`https://lrclib.net/api/get?artist_name=${artistQ}&track_name=${titleQ}`);
+          if (lrcRes.ok) {
+            const lrcData = await lrcRes.json();
+            if (lrcData.syncedLyrics) rawText = lrcData.syncedLyrics;
+            else if (!rawText && lrcData.plainLyrics) rawText = lrcData.plainLyrics;
+          }
+        } catch (e) {}
+      }
+
+      if (!rawText) {
+        if (bookletViewMode === 'lyrics') badge.textContent = 'NO LYRICS';
+        box.innerHTML = '<div class="text-xs text-zinc-500 text-center py-10">등록된 가사가 없는 트랙입니다.</div>';
+        return;
+      }
+
+      const lines = rawText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+      const timeRegex = /^\[(\d{1,2}):(\d{2})(?:\.(\d{1,3}))?\]\s*(.*)$/;
+      const hasSync = lines.some(l => timeRegex.test(l));
+
+      if (hasSync) {
+        if (bookletViewMode === 'lyrics') badge.textContent = 'SYNCED LRC';
+        lines.forEach(line => {
+          const m = line.match(timeRegex);
+          if (m) {
+            const min = parseInt(m[1], 10);
+            const sec = parseInt(m[2], 10);
+            const ms = m[3] ? parseInt(m[3].padEnd(3, '0'), 10) : 0;
+            parsedLyrics.push({ time: min * 60 + sec + ms / 1000, text: m[4] || '♪' });
+          }
+        });
+      } else {
+        if (bookletViewMode === 'lyrics') badge.textContent = 'AUTO SYNC';
+        const totalSec = Math.max(30, (tr.durationMs || 180000) / 1000);
+        const step = totalSec / Math.max(1, lines.length);
+        lines.forEach((txt, i) => parsedLyrics.push({ time: i * step, text: txt }));
+      }
+
+      box.innerHTML = parsedLyrics
+        .map((item, idx) => `<div class="lyric-line" data-idx="${idx}" onclick="jumpToLyric(${item.time})">${escapeHtml(item.text)}</div>`)
+        .join('');
+    }
+
+    function jumpToLyric(timeSec) {
+      if (audioEl.duration) {
+        audioEl.currentTime = Math.max(0, timeSec - lyricsOffset);
+      }
+    }
+
+    function updateLyricsHighlight(curSec, totalSec) {
+      if (!parsedLyrics.length) return;
+      const t = curSec + lyricsOffset;
+      let activeIdx = -1;
+      for (let i = 0; i < parsedLyrics.length; i++) {
+        if (t >= parsedLyrics[i].time) activeIdx = i;
+        else break;
+      }
+
+      const container = document.getElementById('lyrics-lines-box');
+      const lineEls = container ? container.querySelectorAll('.lyric-line') : [];
+      lineEls.forEach((el, idx) => {
+        if (idx === activeIdx) {
+          const start = parsedLyrics[idx].time;
+          const end = parsedLyrics[idx + 1] ? parsedLyrics[idx + 1].time : (totalSec || start + 4);
+          const progress = Math.max(0, Math.min(1, (t - start) / Math.max(0.5, end - start)));
+          el.style.setProperty('--line-progress', progress.toFixed(3));
+          if (!el.classList.contains('active')) {
+            el.classList.add('active');
+            if (container) {
+              const targetScrollTop = el.offsetTop - (container.clientHeight / 2) + (el.clientHeight / 2);
+              container.scrollTo({
+                top: Math.max(0, targetScrollTop),
+                behavior: 'smooth'
+              });
+            }
+          }
+        } else {
+          el.classList.remove('active');
+          el.style.removeProperty('--line-progress');
+        }
+      });
+    }
+
+    function togglePlayPause() {
+      if (!audioEl.src) {
+        if (currentTracks.length > 0) playTrack(0);
+        return;
+      }
+      if (audioEl.paused) {
+        initWebAudioAnalyser();
+        audioEl.play();
+        document.getElementById('play-pause-btn').textContent = '⏸';
+        document.getElementById('lyrics-play-pause-btn').textContent = '⏸';
+      } else {
+        audioEl.pause();
+        document.getElementById('play-pause-btn').textContent = '▶';
+        document.getElementById('lyrics-play-pause-btn').textContent = '▶';
+      }
+    }
+
+    function prevTrack() {
+      if (currentTracks.length === 0) return;
+      const nextIdx = currentTrackIdx > 0 ? currentTrackIdx - 1 : currentTracks.length - 1;
+      playTrack(nextIdx);
+    }
+
+    function nextTrack() {
+      if (currentTracks.length === 0) return;
+      const nextIdx = (currentTrackIdx + 1) % currentTracks.length;
+      playTrack(nextIdx);
+    }
+
+    function seekAudio(e) {
+      if (!audioEl.duration) return;
+      const rect = e.currentTarget.getBoundingClientRect();
+      const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+      audioEl.currentTime = ratio * audioEl.duration;
+    }
+
+    audioEl.addEventListener('timeupdate', () => {
+      if (!audioEl.duration) return;
+      const pct = (audioEl.currentTime / audioEl.duration) * 100;
+      const timeStr = formatDuration(audioEl.currentTime * 1000);
+      const progEl = document.getElementById('audio-progress');
+      const timeEl = document.getElementById('audio-time');
+      const lyricsProgEl = document.getElementById('lyrics-audio-progress');
+      const lyricsTimeEl = document.getElementById('lyrics-audio-time');
+      if (progEl) progEl.style.width = `${pct}%`;
+      if (timeEl) timeEl.textContent = timeStr;
+      if (lyricsProgEl) lyricsProgEl.style.width = `${pct}%`;
+      if (lyricsTimeEl) lyricsTimeEl.textContent = timeStr;
+      updateLyricsHighlight(audioEl.currentTime, audioEl.duration);
+    });
+
+    audioEl.addEventListener('ended', () => nextTrack());
+    audioEl.addEventListener('error', () => {
+      document.getElementById('play-pause-btn').textContent = '▶';
+      document.getElementById('lyrics-play-pause-btn').textContent = '▶';
+      showToast('오디오 스트림을 불러올 수 없습니다. Plex 서버 연결 또는 네트워크를 확인하세요.');
+    });
+
+    function formatDuration(ms) {
+      const totalSec = Math.floor((ms || 0) / 1000);
+      const min = Math.floor(totalSec / 60);
+      const sec = String(totalSec % 60).padStart(2, '0');
+      return `${min}:${sec}`;
+    }
+
+    function sanitizeDisplayText(str) {
+      let s = String(str || '');
+      // 비정상 제어문자나 연속 대체문자(U+FFFD)가 포함된 문자열 정제
+      if (s.includes('\uFFFD')) {
+        s = s.replace(/\uFFFD+/g, '?');
+      }
+      return s;
+    }
+
+    function escapeHtml(str) {
+      return sanitizeDisplayText(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    /* =========================================================================
+       오디오 비주얼라이저 엔진 (CRT 오실로스코프 & 듀얼 아날로그 VU & 오로라 & 바이닐 디스크)
+       ========================================================================= */
+    let audioCtx = null;
+    let analyserNode = null;
+    let analyserL = null;
+    let analyserR = null;
+    let timeDataArray = null;
+    let freqDataArray = null;
+    let timeDataL = null;
+    let timeDataR = null;
+    let webAudioConnected = false;
+    let zeroSignalFrames = 0;
+    let forceSynthVisualizer = false;
+
+    // Safari / 구형 iPadOS 호환용 Canvas roundRect 폴리필
+    if (typeof CanvasRenderingContext2D !== 'undefined' && !CanvasRenderingContext2D.prototype.roundRect) {
+      CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h, radii) {
+        const rList = Array.isArray(radii) ? radii : [radii || 0];
+        const tl = rList[0] ?? 0;
+        const tr = rList[1] ?? tl;
+        const br = rList[2] ?? tl;
+        const bl = rList[3] ?? tr;
+        this.moveTo(x + tl, y);
+        this.lineTo(x + w - tr, y);
+        this.quadraticCurveTo(x + w, y, x + w, y + tr);
+        this.lineTo(x + w, y + h - br);
+        this.quadraticCurveTo(x + w, y + h, x + w - br, y + h);
+        this.lineTo(x + bl, y + h);
+        this.quadraticCurveTo(x, y + h, x, y + h - bl);
+        this.lineTo(x, y + tl);
+        this.quadraticCurveTo(x, y, x + tl, y);
+        this.closePath();
+        return this;
+      };
+    }
+
+    let vuNeedleL = 0;
+    let vuNeedleR = 0;
+    let vuPeakHoldL = 0;
+    let vuPeakHoldR = 0;
+    let vuPeakTimerL = 0;
+    let vuPeakTimerR = 0;
+
+    const auroraParticles = Array.from({ length: 36 }, (_, i) => ({
+      x: (i * 0.6180339) % 1,
+      y: (i * 0.381966) % 1,
+      r: 0.8 + (i % 3) * 0.65,
+      speed: 0.015 + (i % 5) * 0.006,
+      phase: i * 1.1
+    }));
+    let vinylRotation = 0;
+    let smoothedRadialBands = new Float32Array(64);
+    let reelAngleL = 0;
+    let reelAngleR = 0;
+    const matrixPeaks = new Float32Array(24);
+    const matrixHoldTimers = new Float32Array(24);
+    const waterRipples = [];
+    let lastRippleSpawnTime = 0;
+
+    function initWebAudioAnalyser() {
+      try {
+        if (!audioCtx) {
+          const AudioContextCls = window.AudioContext || window.webkitAudioContext;
+          if (!AudioContextCls) return;
+          audioCtx = new AudioContextCls();
+        }
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume();
+        }
+        if (!webAudioConnected) {
+          const source = audioCtx.createMediaElementSource(audioEl);
+          analyserNode = audioCtx.createAnalyser();
+          analyserNode.fftSize = 512;
+          analyserNode.smoothingTimeConstant = 0.78;
+
+          const splitter = audioCtx.createChannelSplitter(2);
+          analyserL = audioCtx.createAnalyser();
+          analyserR = audioCtx.createAnalyser();
+          analyserL.fftSize = 256;
+          analyserR.fftSize = 256;
+
+          source.connect(analyserNode);
+          source.connect(splitter);
+          splitter.connect(analyserL, 0);
+          splitter.connect(analyserR, 1);
+          analyserNode.connect(audioCtx.destination);
+
+          timeDataArray = new Uint8Array(analyserNode.frequencyBinCount);
+          freqDataArray = new Uint8Array(analyserNode.frequencyBinCount);
+          timeDataL = new Uint8Array(analyserL.frequencyBinCount);
+          timeDataR = new Uint8Array(analyserR.frequencyBinCount);
+          webAudioConnected = true;
+        }
+      } catch (e) {
+        console.warn('WebAudio 연결 제한, 합성 파형 모드 동작:', e);
+      }
+    }
+
+    function resizeVisualizerCanvas() {
+      const box = document.getElementById('booklet-visualizer-box');
+      const canvas = document.getElementById('booklet-visualizer-canvas');
+      if (!box || !canvas || box.classList.contains('hidden')) return;
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const w = box.clientWidth;
+      const h = box.clientHeight;
+      if (w > 0 && h > 0) {
+        canvas.width = Math.round(w * dpr);
+        canvas.height = Math.round(h * dpr);
+      }
+    }
+
+    const vizBoxNode = document.getElementById('booklet-visualizer-box');
+    if (vizBoxNode && typeof ResizeObserver !== 'undefined') {
+      new ResizeObserver(() => resizeVisualizerCanvas()).observe(vizBoxNode);
+    }
+
+    function sampleAudioMetrics(nowSec) {
+      const isPlaying = !audioEl.paused && !audioEl.ended && audioEl.currentTime > 0;
+      let hasLiveSignal = false;
+      let wave = new Float32Array(128);
+      let spectrum = new Float32Array(32);
+      let rmsL = 0;
+      let rmsR = 0;
+
+      if (webAudioConnected && analyserNode && isPlaying && !forceSynthVisualizer) {
+        analyserNode.getByteTimeDomainData(timeDataArray);
+        analyserNode.getByteFrequencyData(freqDataArray);
+        analyserL.getByteTimeDomainData(timeDataL);
+        analyserR.getByteTimeDomainData(timeDataR);
+
+        let sumSqL = 0;
+        let sumSqR = 0;
+        for (let i = 0; i < timeDataL.length; i++) {
+          const vL = (timeDataL[i] - 128) / 128;
+          const vR = (timeDataR[i] - 128) / 128;
+          sumSqL += vL * vL;
+          sumSqR += vR * vR;
+        }
+        const rawRmsL = Math.sqrt(sumSqL / timeDataL.length);
+        const rawRmsR = Math.sqrt(sumSqR / timeDataR.length);
+
+        if (rawRmsL > 0.002 || rawRmsR > 0.002) {
+          zeroSignalFrames = 0;
+          hasLiveSignal = true;
+          const shapedL = Math.pow(Math.min(1, rawRmsL * 2.1), 1.35);
+          const shapedR = Math.pow(Math.min(1, rawRmsR * 2.1), 1.35);
+          const beatModL = 0.82 + 0.34 * Math.abs(Math.sin(nowSec * 6.8));
+          const beatModR = 0.82 + 0.34 * Math.abs(Math.cos(nowSec * 7.5 + 0.6));
+          rmsL = Math.min(1.02, shapedL * beatModL);
+          rmsR = Math.min(1.02, shapedR * beatModR);
+
+          for (let i = 0; i < 128; i++) {
+            const idx = Math.floor((i / 128) * timeDataArray.length);
+            wave[i] = ((timeDataArray[idx] - 128) / 128) * 1.45;
+          }
+          for (let i = 0; i < 32; i++) {
+            const idx = Math.floor((i / 32) * (freqDataArray.length * 0.75));
+            spectrum[i] = Math.min(1, (freqDataArray[idx] / 255) * 1.25);
+          }
+        } else {
+          zeroSignalFrames++;
+          if (zeroSignalFrames > 30) {
+            forceSynthVisualizer = true;
+          }
+        }
+      }
+
+      if (!hasLiveSignal) {
+        if (isPlaying || currentTrackIdx >= 0 || (isLyricsOpen && bookletViewMode !== 'lyrics')) {
+          const activeFactor = isPlaying ? 1.0 : 0.18;
+          const beatPulseL = Math.pow(Math.max(0, Math.sin(nowSec * 5.2)), 2.2);
+          const beatPulseR = Math.pow(Math.max(0, Math.sin(nowSec * 5.2 + 0.85)), 2.0);
+          const subGroove = 0.5 + 0.5 * Math.sin(nowSec * 2.3);
+          const hiHat = Math.abs(Math.sin(nowSec * 12.4)) * 0.16;
+
+          rmsL = Math.min(0.98, (0.24 + beatPulseL * 0.56 + subGroove * 0.14) * activeFactor);
+          rmsR = Math.min(0.98, (0.22 + beatPulseR * 0.54 + hiHat + subGroove * 0.12) * activeFactor);
+
+          for (let i = 0; i < 128; i++) {
+            const t = i / 128;
+            const env = Math.sin(t * Math.PI);
+            const s1 = Math.sin(t * 14 + nowSec * 9.5) * 0.45;
+            const s2 = Math.sin(t * 31 - nowSec * 15) * 0.25;
+            const s3 = Math.cos(t * 7 + nowSec * 4.2) * 0.3;
+            wave[i] = (s1 + s2 + s3) * env * (0.35 + beatPulseL * 0.75) * activeFactor;
+          }
+          for (let i = 0; i < 32; i++) {
+            const bandFalloff = Math.exp(-i * 0.055);
+            const bounce = Math.abs(Math.sin(nowSec * (4.2 + i * 0.35) + i));
+            spectrum[i] = Math.min(1, bandFalloff * (0.3 + bounce * 0.75) * activeFactor);
+          }
+        }
+      }
+
+      return { wave, spectrum, rmsL, rmsR, isPlaying: isPlaying || currentTrackIdx >= 0 };
+    }
+
+    // 1) CRT 오실로스코프 & 스펙트럼 애널라이저
+    function drawOscilloscope(ctx, w, h, metrics, nowSec) {
+      if (w < 40 || h < 40) return;
+      ctx.clearRect(0, 0, w, h);
+
+      const bgGrad = ctx.createRadialGradient(w * 0.5, h * 0.45, 10, w * 0.5, h * 0.45, Math.max(w, h) * 0.75);
+      bgGrad.addColorStop(0, '#14171f');
+      bgGrad.addColorStop(1, '#07080b');
+      ctx.fillStyle = bgGrad;
+      ctx.fillRect(0, 0, w, h);
+
+      const scopeH = h * 0.72;
+      const specTop = scopeH + 6;
+      const specH = h - specTop - 10;
+
+      ctx.strokeStyle = 'rgba(251, 191, 36, 0.09)';
+      ctx.lineWidth = 1;
+      const cols = 10;
+      const rows = 6;
+      for (let c = 1; c < cols; c++) {
+        const x = (w / cols) * c;
+        ctx.beginPath();
+        ctx.moveTo(x, 8);
+        ctx.lineTo(x, scopeH);
+        ctx.stroke();
+      }
+      for (let r = 1; r < rows; r++) {
+        const y = 8 + ((scopeH - 8) / rows) * r;
+        ctx.beginPath();
+        ctx.moveTo(10, y);
+        ctx.lineTo(w - 10, y);
+        ctx.stroke();
+      }
+
+      const midY = 8 + (scopeH - 8) * 0.5;
+      ctx.strokeStyle = 'rgba(251, 191, 36, 0.22)';
+      ctx.beginPath();
+      ctx.moveTo(10, midY);
+      ctx.lineTo(w - 10, midY);
+      ctx.stroke();
+
+      ctx.save();
+      ctx.beginPath();
+      const padX = 12;
+      const drawW = w - padX * 2;
+      const amp = (scopeH - 24) * 0.44;
+      for (let i = 0; i < metrics.wave.length; i++) {
+        const x = padX + (i / (metrics.wave.length - 1)) * drawW;
+        const y = midY + metrics.wave[i] * amp;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.strokeStyle = '#fbbf24';
+      ctx.lineWidth = 2.2;
+      ctx.shadowColor = 'rgba(251, 191, 36, 0.85)';
+      ctx.shadowBlur = 10;
+      ctx.stroke();
+      ctx.restore();
+
+      const barCount = metrics.spectrum.length;
+      const barGap = 3;
+      const barW = Math.max(2, (drawW - barGap * (barCount - 1)) / barCount);
+      for (let i = 0; i < barCount; i++) {
+        const val = metrics.spectrum[i];
+        const bH = Math.max(2, val * specH);
+        const bx = padX + i * (barW + barGap);
+        const by = specTop + specH - bH;
+
+        const barGrad = ctx.createLinearGradient(0, by, 0, specTop + specH);
+        barGrad.addColorStop(0, val > 0.78 ? '#f87171' : '#fde68a');
+        barGrad.addColorStop(1, 'rgba(245, 158, 11, 0.25)');
+        ctx.fillStyle = barGrad;
+        ctx.fillRect(bx, by, barW, bH);
+      }
+
+      ctx.fillStyle = 'rgba(251, 191, 36, 0.55)';
+      ctx.font = '700 9px "JetBrains Mono", monospace';
+      ctx.fillText(`CH1+2 • ${metrics.isPlaying ? 'LIVE SIGNAL' : 'STANDBY'}`, 14, 19);
+    }
+
+    // 2) 매킨토시(McIntosh) 오디오 감성 아날로그 듀얼 VU 레벨 미터
+    function drawSingleVuMeter(ctx, boxX, boxY, boxW, boxH, channelLabel, needleVal, peakVal) {
+      if (boxW < 24 || boxH < 24) return;
+      ctx.save();
+      ctx.beginPath();
+      ctx.roundRect(boxX, boxY, boxW, boxH, 10);
+      ctx.clip();
+
+      // 매킨토시 특유의 딥 블루 백라이트 유리창 그라디언트
+      const faceGrad = ctx.createRadialGradient(
+        boxX + boxW * 0.5,
+        boxY + boxH * 0.85,
+        Math.max(4, boxW * 0.08),
+        boxX + boxW * 0.5,
+        boxY + boxH * 0.5,
+        Math.max(12, boxW * 0.72)
+      );
+      faceGrad.addColorStop(0, '#0c4a6e');
+      faceGrad.addColorStop(0.55, '#072a4a');
+      faceGrad.addColorStop(1, '#031224');
+      ctx.fillStyle = faceGrad;
+      ctx.fillRect(boxX, boxY, boxW, boxH);
+
+      // 유리 패널 은은한 상단 반사광
+      const glassGrad = ctx.createLinearGradient(boxX, boxY, boxX, boxY + boxH * 0.45);
+      glassGrad.addColorStop(0, 'rgba(186, 230, 253, 0.14)');
+      glassGrad.addColorStop(1, 'rgba(186, 230, 253, 0)');
+      ctx.fillStyle = glassGrad;
+      ctx.fillRect(boxX, boxY, boxW, boxH * 0.45);
+
+      const pivotX = boxX + boxW * 0.5;
+      const pivotY = boxY + boxH * 1.12;
+      const radius = Math.max(16, Math.min(boxW * 0.66, boxH * 0.94));
+      const startAngle = -Math.PI * 0.74;
+      const endAngle = -Math.PI * 0.26;
+      const zeroAngle = startAngle + (endAngle - startAngle) * 0.72;
+
+      // 눈금 아크 (0dB 이하: 매킨토시 시안/아이스블루 발광, 0dB 이상: 레드)
+      ctx.save();
+      ctx.shadowColor = 'rgba(56, 189, 248, 0.65)';
+      ctx.shadowBlur = 8;
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = '#38bdf8';
+      ctx.beginPath();
+      ctx.arc(pivotX, pivotY, radius, startAngle, zeroAngle);
+      ctx.stroke();
+
+      ctx.shadowColor = 'rgba(248, 113, 113, 0.75)';
+      ctx.strokeStyle = '#f87171';
+      ctx.beginPath();
+      ctx.arc(pivotX, pivotY, radius, zeroAngle, endAngle);
+      ctx.stroke();
+      ctx.restore();
+
+      const ticks = [
+        { pos: 0.0, label: '-20', red: false },
+        { pos: 0.24, label: '-10', red: false },
+        { pos: 0.44, label: '-5', red: false },
+        { pos: 0.58, label: '-3', red: false },
+        { pos: 0.72, label: '0', red: false },
+        { pos: 0.86, label: '+1', red: true },
+        { pos: 1.0, label: '+3', red: true }
+      ];
+
+      ctx.font = '700 9px "JetBrains Mono", monospace';
+      ctx.textAlign = 'center';
+      ticks.forEach(tk => {
+        const ang = startAngle + (endAngle - startAngle) * tk.pos;
+        const rIn = radius - 6;
+        const rOut = radius + 5;
+        ctx.strokeStyle = tk.red ? '#f87171' : '#bae6fd';
+        ctx.lineWidth = tk.pos === 0.72 ? 2.2 : 1.4;
+        ctx.beginPath();
+        ctx.moveTo(pivotX + Math.cos(ang) * rIn, pivotY + Math.sin(ang) * rIn);
+        ctx.lineTo(pivotX + Math.cos(ang) * rOut, pivotY + Math.sin(ang) * rOut);
+        ctx.stroke();
+
+        const rTxt = radius + 14;
+        ctx.fillStyle = tk.red ? '#fca5a5' : '#e0f2fe';
+        ctx.fillText(tk.label, pivotX + Math.cos(ang) * rTxt, pivotY + Math.sin(ang) * rTxt);
+      });
+
+      // 매킨토시 시그니처 그린/아이스블루 발광 로고 표기
+      ctx.save();
+      ctx.shadowColor = 'rgba(74, 222, 128, 0.55)';
+      ctx.shadowBlur = 8;
+      ctx.fillStyle = '#86efac';
+      ctx.font = '800 11px "Inter", sans-serif';
+      ctx.fillText('WATTS / dB', pivotX, boxY + boxH * 0.56);
+      ctx.restore();
+
+      ctx.fillStyle = '#7dd3fc';
+      ctx.font = '700 9px "JetBrains Mono", monospace';
+      ctx.fillText(channelLabel, pivotX, boxY + boxH * 0.71);
+
+      // 우측 상단 POWER GUARD / PEAK LED 인디케이터
+      const ledX = boxX + boxW - 22;
+      const ledY = boxY + 15;
+      const isPeakLit = peakVal > 0.76;
+      ctx.beginPath();
+      ctx.arc(ledX, ledY, 4, 0, Math.PI * 2);
+      ctx.fillStyle = isPeakLit ? '#fb923c' : 'rgba(124, 45, 18, 0.45)';
+      ctx.fill();
+      if (isPeakLit) {
+        ctx.shadowColor = '#fb923c';
+        ctx.shadowBlur = 10;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+      }
+      ctx.fillStyle = '#bae6fd';
+      ctx.font = '700 6.5px "JetBrains Mono", monospace';
+      ctx.fillText('GUARD', ledX, ledY + 11);
+
+      const clamped = Math.max(0, Math.min(1.04, needleVal));
+      const needleAng = startAngle + (endAngle - startAngle) * clamped;
+      const needleLen = radius + 7;
+
+      // 바늘 그림자
+      ctx.strokeStyle = 'rgba(0, 0, 0, 0.45)';
+      ctx.lineWidth = 2.8;
+      ctx.beginPath();
+      ctx.moveTo(pivotX + 2, pivotY + 2);
+      ctx.lineTo(pivotX + 2 + Math.cos(needleAng) * needleLen, pivotY + 2 + Math.sin(needleAng) * needleLen);
+      ctx.stroke();
+
+      // 바늘 본체 (매킨토시 오렌지-레드 팁 & 발광 화이트 바늘)
+      ctx.save();
+      ctx.shadowColor = clamped > 0.72 ? 'rgba(248, 113, 113, 0.85)' : 'rgba(224, 242, 254, 0.75)';
+      ctx.shadowBlur = 8;
+      ctx.strokeStyle = clamped > 0.72 ? '#f87171' : '#f0f9ff';
+      ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.moveTo(pivotX, pivotY);
+      ctx.lineTo(pivotX + Math.cos(needleAng) * needleLen, pivotY + Math.sin(needleAng) * needleLen);
+      ctx.stroke();
+      ctx.restore();
+
+      // 하단 힌지 캡
+      ctx.fillStyle = '#020617';
+      ctx.beginPath();
+      ctx.arc(pivotX, boxY + boxH - 2, 16, Math.PI, 0);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(56, 189, 248, 0.35)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      // 베젤 테두리
+      ctx.strokeStyle = 'rgba(125, 211, 252, 0.32)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.roundRect(boxX + 0.75, boxY + 0.75, boxW - 1.5, boxH - 1.5, 10);
+      ctx.stroke();
+
+      ctx.restore();
+    }
+
+    function drawDualVuMeters(ctx, w, h, metrics) {
+      if (w < 40 || h < 40) return;
+      ctx.clearRect(0, 0, w, h);
+      ctx.fillStyle = '#09090d';
+      ctx.fillRect(0, 0, w, h);
+
+      const attack = 0.52;
+      const release = 0.22;
+      vuNeedleL += (metrics.rmsL - vuNeedleL) * (metrics.rmsL > vuNeedleL ? attack : release);
+      vuNeedleR += (metrics.rmsR - vuNeedleR) * (metrics.rmsR > vuNeedleR ? attack : release);
+
+      if (vuNeedleL >= vuPeakHoldL) {
+        vuPeakHoldL = vuNeedleL;
+        vuPeakTimerL = 36;
+      } else if (vuPeakTimerL > 0) {
+        vuPeakTimerL--;
+      } else {
+        vuPeakHoldL *= 0.94;
+      }
+
+      if (vuNeedleR >= vuPeakHoldR) {
+        vuPeakHoldR = vuNeedleR;
+        vuPeakTimerR = 36;
+      } else if (vuPeakTimerR > 0) {
+        vuPeakTimerR--;
+      } else {
+        vuPeakHoldR *= 0.94;
+      }
+
+      const pad = 12;
+      const gap = 10;
+      if (w >= h * 1.15) {
+        const meterW = (w - pad * 2 - gap) * 0.5;
+        const meterH = h - pad * 2;
+        drawSingleVuMeter(ctx, pad, pad, meterW, meterH, 'LEFT CHANNEL', vuNeedleL, vuPeakHoldL);
+        drawSingleVuMeter(ctx, pad + meterW + gap, pad, meterW, meterH, 'RIGHT CHANNEL', vuNeedleR, vuPeakHoldR);
+      } else {
+        const meterW = w - pad * 2;
+        const meterH = (h - pad * 2 - gap) * 0.5;
+        drawSingleVuMeter(ctx, pad, pad, meterW, meterH, 'LEFT CHANNEL', vuNeedleL, vuPeakHoldL);
+        drawSingleVuMeter(ctx, pad, pad + meterH + gap, meterW, meterH, 'RIGHT CHANNEL', vuNeedleR, vuPeakHoldR);
+      }
+    }
+
+    // 3) 오로라 리본 웨이브 & 스파클 비주얼라이저 (차분한 감도 + 웅장하고 깊은 파동 높낮이)
+    let smoothedAuroraEnergy = 0;
+    const smoothedAuroraSpectrum = new Float32Array(32);
+
+    function drawAuroraVisualizer(ctx, w, h, metrics, nowSec) {
+      if (w < 40 || h < 40) return;
+      ctx.clearRect(0, 0, w, h);
+
+      const skyGrad = ctx.createLinearGradient(0, 0, 0, h);
+      skyGrad.addColorStop(0, '#04060e');
+      skyGrad.addColorStop(0.55, '#0a0f1f');
+      skyGrad.addColorStop(1, '#08080e');
+      ctx.fillStyle = skyGrad;
+      ctx.fillRect(0, 0, w, h);
+
+      // 감도(반응 민감도)는 낮추고 묵직한 로우패스 필터로 부드럽게 추종
+      const targetEnergy = Math.min(1, (metrics.rmsL + metrics.rmsR) * 0.32);
+      smoothedAuroraEnergy += (targetEnergy - smoothedAuroraEnergy) * 0.04;
+      const energy = smoothedAuroraEnergy;
+
+      for (let i = 0; i < 32; i++) {
+        const targetSpec = (metrics.spectrum[i] || 0) * 0.28;
+        smoothedAuroraSpectrum[i] += (targetSpec - smoothedAuroraSpectrum[i]) * 0.05;
+      }
+
+      // 물결 흐름 속도는 여유롭고 우아하게 유지
+      const speed = metrics.isPlaying ? 0.58 + energy * 0.25 : 0.24;
+
+      ctx.save();
+      ctx.globalCompositeOperation = 'screen';
+
+      // 파동 진폭(amp)을 크게 확장하여 웅장한 높낮이와 역동적인 굴곡 표현
+      const ribbons = [
+        { c1: 'rgba(251, 191, 36, 0.36)', c2: 'rgba(244, 63, 94, 0.22)', freq: 1.6, phase: 0.0, amp: 0.27, yOff: 0.50 },
+        { c1: 'rgba(56, 189, 248, 0.40)', c2: 'rgba(168, 85, 247, 0.24)', freq: 2.0, phase: 1.7, amp: 0.30, yOff: 0.52 },
+        { c1: 'rgba(52, 211, 153, 0.36)', c2: 'rgba(59, 130, 246, 0.20)', freq: 1.35, phase: 3.2, amp: 0.26, yOff: 0.56 },
+        { c1: 'rgba(253, 224, 71, 0.28)', c2: 'rgba(236, 72, 153, 0.18)', freq: 2.3, phase: 4.6, amp: 0.23, yOff: 0.48 }
+      ];
+
+      ribbons.forEach((rb, rIdx) => {
+        const ribbonGrad = ctx.createLinearGradient(0, h * 0.10, w, h * 0.90);
+        ribbonGrad.addColorStop(0, 'rgba(0,0,0,0)');
+        ribbonGrad.addColorStop(0.22, rb.c1);
+        ribbonGrad.addColorStop(0.78, rb.c2);
+        ribbonGrad.addColorStop(1, 'rgba(0,0,0,0)');
+
+        ctx.fillStyle = ribbonGrad;
+        ctx.beginPath();
+        ctx.moveTo(0, h);
+
+        const steps = 56;
+        for (let i = 0; i <= steps; i++) {
+          const t = i / steps;
+          const x = t * w;
+          const specIdx = Math.min(31, Math.floor(t * 32));
+          const specBoost = smoothedAuroraSpectrum[specIdx] * (h * 0.16);
+          const wave1 = Math.sin(t * Math.PI * rb.freq + nowSec * speed + rb.phase);
+          const wave2 = Math.cos(t * Math.PI * (rb.freq * 1.45) - nowSec * speed * 0.55 + rIdx);
+          const dynamicHeight = h * rb.amp * (0.68 + energy * 0.62);
+          const y = h * rb.yOff + (wave1 * 0.68 + wave2 * 0.32) * dynamicHeight - specBoost * 0.65;
+          ctx.lineTo(x, y);
+        }
+
+        ctx.lineTo(w, h);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.strokeStyle = rb.c1;
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        for (let i = 0; i <= steps; i++) {
+          const t = i / steps;
+          const x = t * w;
+          const specIdx = Math.min(31, Math.floor(t * 32));
+          const specBoost = smoothedAuroraSpectrum[specIdx] * (h * 0.16);
+          const wave1 = Math.sin(t * Math.PI * rb.freq + nowSec * speed + rb.phase);
+          const wave2 = Math.cos(t * Math.PI * (rb.freq * 1.45) - nowSec * speed * 0.55 + rIdx);
+          const dynamicHeight = h * rb.amp * (0.68 + energy * 0.62);
+          const y = h * rb.yOff + (wave1 * 0.68 + wave2 * 0.32) * dynamicHeight - specBoost * 0.65;
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+      });
+
+      auroraParticles.forEach(pt => {
+        const driftY = (pt.y - nowSec * pt.speed * (0.3 + energy * 0.4) + 10) % 1;
+        const px = ((pt.x + Math.sin(nowSec * 0.45 + pt.phase) * 0.02 + 1) % 1) * w;
+        const py = driftY * h;
+        const twinkle = 0.25 + 0.75 * Math.abs(Math.sin(nowSec * 1.4 + pt.phase));
+        ctx.fillStyle = `rgba(224, 242, 254, ${twinkle * (0.28 + energy * 0.42)})`;
+        ctx.beginPath();
+        ctx.arc(px, py, pt.r * (0.75 + energy * 0.35), 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      ctx.restore();
+    }
+
+    // 4) 바이닐 레코드판 & 라디얼 스펙트럼 비주얼라이저
+    function drawVinylDiscVisualizer(ctx, w, h, metrics, nowSec) {
+      if (w < 40 || h < 40) return;
+      ctx.clearRect(0, 0, w, h);
+
+      const cx = w * 0.5;
+      const cy = h * 0.5;
+      const minDim = Math.min(w, h);
+      const discR = Math.max(28, minDim * 0.31);
+      const energy = Math.min(1, (metrics.rmsL + metrics.rmsR) * 0.85);
+
+      const activeAlbum = filteredAlbums.find(a => a.id === selectedId);
+      const accentBg = activeAlbum?.palette?.bg || '#d97706';
+
+      const haloR1 = Math.max(discR + 8, minDim * 0.48);
+      const haloGrad = ctx.createRadialGradient(cx, cy, discR * 0.6, cx, cy, haloR1);
+      haloGrad.addColorStop(0, `rgba(251, 191, 36, ${0.14 + energy * 0.22})`);
+      haloGrad.addColorStop(1, 'rgba(7, 8, 11, 0)');
+      ctx.fillStyle = haloGrad;
+      ctx.fillRect(0, 0, w, h);
+
+      const bandCount = 64;
+      ctx.save();
+      ctx.translate(cx, cy);
+      for (let i = 0; i < bandCount; i++) {
+        const specIdx = i < 32 ? i : 63 - i;
+        const targetVal = metrics.spectrum[specIdx] || 0;
+        smoothedRadialBands[i] += (targetVal - smoothedRadialBands[i]) * 0.28;
+
+        const angle = (i / bandCount) * Math.PI * 2 - Math.PI * 0.5;
+        const barLen = 4 + smoothedRadialBands[i] * (minDim * 0.16);
+        const rStart = discR + 4;
+        const rEnd = rStart + barLen;
+
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(angle) * rStart, Math.sin(angle) * rStart);
+        ctx.lineTo(Math.cos(angle) * rEnd, Math.sin(angle) * rEnd);
+        ctx.strokeStyle = smoothedRadialBands[i] > 0.62
+          ? 'rgba(253, 224, 71, 0.92)'
+          : 'rgba(251, 191, 36, 0.48)';
+        ctx.lineWidth = Math.max(2, (Math.PI * 2 * rStart) / bandCount * 0.52);
+        ctx.lineCap = 'round';
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      if (metrics.isPlaying) {
+        vinylRotation += 0.024;
+      }
+
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(vinylRotation);
+
+      ctx.beginPath();
+      ctx.arc(0, 0, discR, 0, Math.PI * 2);
+      ctx.fillStyle = '#0d0e12';
+      ctx.fill();
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.16)';
+      ctx.stroke();
+
+      for (let g = 0.48; g <= 0.92; g += 0.07) {
+        ctx.beginPath();
+        ctx.arc(0, 0, discR * g, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
+
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.arc(0, 0, discR * 0.96, -0.45, 0.18);
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.07)';
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.arc(0, 0, discR * 0.96, Math.PI - 0.45, Math.PI + 0.18);
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.07)';
+      ctx.fill();
+
+      const labelR = discR * 0.36;
+      ctx.beginPath();
+      ctx.arc(0, 0, labelR, 0, Math.PI * 2);
+      ctx.fillStyle = accentBg;
+      ctx.fill();
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = 'rgba(251, 191, 36, 0.65)';
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(0, 0, Math.max(3, discR * 0.06), 0, Math.PI * 2);
+      ctx.fillStyle = '#07080b';
+      ctx.fill();
+
+      ctx.restore();
+    }
+
+    // 5) 빈티지 듀얼 릴투릴(REEL) 테이프 데크 (실물 랙마운트 알루미늄 베젤 + 크롬 릴 + 듀얼 미니 VU 미터)
+    function drawReelTapeVisualizer(ctx, w, h, metrics, nowSec) {
+      if (w < 40 || h < 40) return;
+      ctx.clearRect(0, 0, w, h);
+
+      // 1) 다층 브러시드 실버-티타늄 알루미늄 페이스플레이트 배경
+      const plateGrad = ctx.createLinearGradient(0, 0, 0, h);
+      plateGrad.addColorStop(0, '#d6dae2');
+      plateGrad.addColorStop(0.14, '#bcc2cd');
+      plateGrad.addColorStop(0.52, '#a7aebc');
+      plateGrad.addColorStop(0.88, '#8d94a3');
+      plateGrad.addColorStop(1, '#737a8a');
+      ctx.fillStyle = plateGrad;
+      ctx.fillRect(0, 0, w, h);
+
+      // 미세 브러시드 메탈 가로 헤어라인 질감 (명암 교차)
+      for (let y = 0; y < h; y += 2) {
+        ctx.fillStyle = y % 4 === 0 ? 'rgba(255, 255, 255, 0.09)' : 'rgba(15, 23, 42, 0.04)';
+        ctx.fillRect(0, y, w, 1);
+      }
+
+      // 랙마운트 외곽 입체 베젤 & 상하단 리세스 홈
+      ctx.strokeStyle = '#272930';
+      ctx.lineWidth = 4;
+      ctx.strokeRect(2, 2, w - 4, h - 4);
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(4.5, 4.5, w - 9, h - 9);
+
+      // 모서리 육각/십자 나사 볼트
+      [[13, 13], [w - 13, 13], [13, h - 13], [w - 13, h - 13]].forEach(([bx, by]) => {
+        const sGrad = ctx.createRadialGradient(bx - 1.5, by - 1.5, 0.5, bx, by, 5);
+        sGrad.addColorStop(0, '#f4f4f5');
+        sGrad.addColorStop(0.6, '#71717a');
+        sGrad.addColorStop(1, '#27272a');
+        ctx.beginPath();
+        ctx.arc(bx, by, 4.5, 0, Math.PI * 2);
+        ctx.fillStyle = sGrad;
+        ctx.fill();
+        ctx.strokeStyle = '#18181b';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(bx - 2.2, by - 2.2);
+        ctx.lineTo(bx + 2.2, by + 2.2);
+        ctx.stroke();
+      });
+
+      // 상단 각인 모델명 & 테이프 스피드 인디케이터
+      ctx.fillStyle = 'rgba(24, 24, 27, 0.72)';
+      ctx.font = '800 8.5px "JetBrains Mono", monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('SPINE REEL-200  •  15 IPS MASTER', w * 0.5, 16);
+
+      const progress = audioEl.duration ? Math.min(1, Math.max(0, audioEl.currentTime / audioEl.duration)) : 0.38;
+      const energy = Math.min(1, (metrics.rmsL + metrics.rmsR) * 0.75);
+
+      if (metrics.isPlaying) {
+        reelAngleL += 0.024 + progress * 0.012;
+        reelAngleR += 0.034 - progress * 0.012;
+      }
+
+      const reelY = h * 0.40;
+      const reelDist = Math.min(w * 0.24, h * 0.39);
+      const lx = w * 0.5 - reelDist;
+      const rx = w * 0.5 + reelDist;
+      const outerR = Math.max(26, Math.min(w * 0.215, h * 0.34));
+      const hubR = outerR * 0.33;
+
+      const tapeRL = hubR + (outerR * 0.88 - hubR) * (1 - progress * 0.75);
+      const tapeRR = hubR + (outerR * 0.88 - hubR) * (0.25 + progress * 0.75);
+
+      // 하단 메탈릭 테이프 트랜스포트 헤드 & 크롬 가이드 롤러
+      const deckY = reelY + outerR + 10;
+      const rollerY = Math.min(h * 0.73, deckY + 8);
+      const glX = lx - outerR * 0.32;
+      const grX = rx + outerR * 0.32;
+      const headX = w * 0.5;
+
+      // 마그네틱 테이프 주행 라인 + 미세 앰버 하이라이트
+      ctx.save();
+      ctx.strokeStyle = '#291509';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(lx - tapeRL * 0.94, reelY + tapeRL * 0.32);
+      ctx.lineTo(glX, rollerY);
+      ctx.lineTo(headX - 30, rollerY - 5);
+      ctx.lineTo(headX + 30, rollerY - 5);
+      ctx.lineTo(grX, rollerY);
+      ctx.lineTo(rx + tapeRR * 0.94, reelY + tapeRR * 0.32);
+      ctx.stroke();
+
+      // 크롬 텐션 암 & 가이드 롤러 (좌/우)
+      [glX, grX, headX - 38, headX + 38].forEach((gx, idx) => {
+        const gy = idx < 2 ? rollerY : rollerY - 2;
+        const r = idx < 2 ? 7.5 : 5.5;
+        ctx.beginPath();
+        ctx.arc(gx + 1.5, gy + 2, r, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(0,0,0,0.32)';
+        ctx.fill();
+
+        const rGrad = ctx.createRadialGradient(gx - 2, gy - 2, 1, gx, gy, r);
+        rGrad.addColorStop(0, '#ffffff');
+        rGrad.addColorStop(0.45, '#cbd5e1');
+        rGrad.addColorStop(0.85, '#64748b');
+        rGrad.addColorStop(1, '#1e293b');
+        ctx.beginPath();
+        ctx.arc(gx, gy, r, 0, Math.PI * 2);
+        ctx.fillStyle = rGrad;
+        ctx.fill();
+        ctx.strokeStyle = '#0f172a';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      });
+
+      // 중앙 스테레오 마그네틱 헤드 하우징 실드
+      ctx.fillStyle = 'rgba(0,0,0,0.35)';
+      ctx.beginPath();
+      ctx.roundRect(headX - 31, rollerY - 16, 64, 24, 4);
+      ctx.fill();
+
+      const hGrad = ctx.createLinearGradient(headX - 32, rollerY - 18, headX + 32, rollerY + 8);
+      hGrad.addColorStop(0, '#52525b');
+      hGrad.addColorStop(0.35, '#e4e4e7');
+      hGrad.addColorStop(0.65, '#a1a1aa');
+      hGrad.addColorStop(1, '#3f3f46');
+      ctx.fillStyle = hGrad;
+      ctx.beginPath();
+      ctx.roundRect(headX - 32, rollerY - 18, 64, 23, 4);
+      ctx.fill();
+      ctx.strokeStyle = '#18181b';
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+
+      ctx.fillStyle = '#18181b';
+      ctx.font = '800 6.5px "JetBrains Mono", monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('MAGNETIC HEAD', headX, rollerY - 5);
+
+      // 중앙 파일럿 램프 (헤드 블록 위)
+      ctx.beginPath();
+      ctx.arc(headX, reelY, 5, 0, Math.PI * 2);
+      ctx.fillStyle = metrics.isPlaying ? '#f59e0b' : '#52525b';
+      if (metrics.isPlaying) {
+        ctx.shadowColor = '#fbbf24';
+        ctx.shadowBlur = 14;
+      }
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = '#27272a';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.restore();
+
+      // 개별 오픈 릴(Open Reel) 입체 렌더링
+      const drawSingleReel = (cx, cy, tapeR, angle) => {
+        ctx.save();
+        ctx.translate(cx, cy);
+
+        // 릴 드롭 그림자
+        ctx.beginPath();
+        ctx.arc(4, 6, outerR, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.42)';
+        ctx.fill();
+
+        // 투명 아크릴 보호 플랜지 베이스 + 반사광
+        const flangeGrad = ctx.createLinearGradient(-outerR, -outerR, outerR, outerR);
+        flangeGrad.addColorStop(0, 'rgba(39, 39, 42, 0.85)');
+        flangeGrad.addColorStop(0.45, 'rgba(24, 24, 27, 0.78)');
+        flangeGrad.addColorStop(0.55, 'rgba(255, 255, 255, 0.14)');
+        flangeGrad.addColorStop(1, 'rgba(15, 15, 20, 0.88)');
+        ctx.beginPath();
+        ctx.arc(0, 0, outerR, 0, Math.PI * 2);
+        ctx.fillStyle = flangeGrad;
+        ctx.fill();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.65)';
+        ctx.stroke();
+
+        // 마그네틱 테이프 감김 영역
+        ctx.beginPath();
+        ctx.arc(0, 0, tapeR, 0, Math.PI * 2);
+        ctx.fillStyle = '#26140c';
+        ctx.fill();
+
+        for (let r = hubR + 3; r < tapeR; r += 3.5) {
+          ctx.beginPath();
+          ctx.arc(0, 0, r, 0, Math.PI * 2);
+          ctx.strokeStyle = 'rgba(251, 191, 36, 0.055)';
+          ctx.lineWidth = 1;
+          ctx.stroke();
+        }
+
+        // 회전하는 3날 브러시드 알루미늄 릴 스포크
+        ctx.rotate(angle);
+        for (let s = 0; s < 3; s++) {
+          const a = (s * Math.PI * 2) / 3;
+          ctx.save();
+          ctx.rotate(a);
+          const spokeGrad = ctx.createLinearGradient(hubR, -10, outerR, 10);
+          spokeGrad.addColorStop(0, '#f4f4f5');
+          spokeGrad.addColorStop(0.5, '#d4d4d8');
+          spokeGrad.addColorStop(1, '#a1a1aa');
+          ctx.beginPath();
+          ctx.moveTo(hubR * 0.9, -6.5);
+          ctx.lineTo(outerR * 0.96, -13);
+          ctx.arc(0, 0, outerR * 0.96, -0.23, 0.23);
+          ctx.lineTo(hubR * 0.9, 6.5);
+          ctx.closePath();
+          ctx.fillStyle = spokeGrad;
+          ctx.fill();
+          ctx.strokeStyle = 'rgba(24, 24, 27, 0.55)';
+          ctx.lineWidth = 1;
+          ctx.stroke();
+          ctx.restore();
+        }
+
+        // 중앙 NAB 메탈 클램프 허브 & 3핀 락
+        const hubGrad = ctx.createRadialGradient(-3, -3, 2, 0, 0, hubR);
+        hubGrad.addColorStop(0, '#e4e4e7');
+        hubGrad.addColorStop(0.55, '#52525b');
+        hubGrad.addColorStop(1, '#18181b');
+        ctx.beginPath();
+        ctx.arc(0, 0, hubR, 0, Math.PI * 2);
+        ctx.fillStyle = hubGrad;
+        ctx.fill();
+        ctx.strokeStyle = '#f4f4f5';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        // 허브 내 3개 고정 핀 홀
+        for (let p = 0; p < 3; p++) {
+          const pa = (p * Math.PI * 2) / 3;
+          ctx.beginPath();
+          ctx.arc(Math.cos(pa) * hubR * 0.62, Math.sin(pa) * hubR * 0.62, Math.max(1.5, hubR * 0.11), 0, Math.PI * 2);
+          ctx.fillStyle = '#09090b';
+          ctx.fill();
+        }
+
+        ctx.beginPath();
+        ctx.arc(0, 0, hubR * 0.32, 0, Math.PI * 2);
+        ctx.fillStyle = '#09090b';
+        ctx.fill();
+
+        ctx.restore();
+      };
+
+      drawSingleReel(lx, reelY, tapeRL, reelAngleL);
+      drawSingleReel(rx, reelY, tapeRR, reelAngleR);
+
+      // 하단 좌측 웜-앰버 듀얼 미니 VU 미터 & 우측 트랜스포트 버튼 (겹침 방지 + 내부 클리핑 적용)
+      const bottomY = Math.max(rollerY + 12, h * 0.76);
+      const bottomH = Math.max(24, h - bottomY - 11);
+      if (bottomH >= 20) {
+        const miniW = Math.min(72, Math.max(44, w * 0.165));
+        const vuGap = 6;
+        const vuTotalW = miniW * 2 + vuGap;
+        const startX = Math.max(18, Math.min(w * 0.5 - vuTotalW - 14, w * 0.5 - reelDist - outerR * 0.45));
+
+        [metrics.rmsL, metrics.rmsR].forEach((lvl, idx) => {
+          const mx = startX + idx * (miniW + vuGap);
+          ctx.save();
+          ctx.beginPath();
+          ctx.roundRect(mx, bottomY, miniW, bottomH, 4);
+          ctx.clip();
+
+          const vuBg = ctx.createRadialGradient(mx + miniW * 0.5, bottomY + bottomH * 0.85, 2, mx + miniW * 0.5, bottomY + bottomH * 0.5, miniW * 0.72);
+          vuBg.addColorStop(0, '#fef9c3');
+          vuBg.addColorStop(1, '#f59e0b');
+          ctx.fillStyle = vuBg;
+          ctx.fillRect(mx, bottomY, miniW, bottomH);
+
+          // 미니 눈금 & 바늘 (피벗을 하단 테두리 안쪽에 두고 반경을 bottomH * 0.78 이내로 제한)
+          const pX = mx + miniW * 0.5;
+          const pY = bottomY + bottomH * 1.04;
+          const mR = Math.min(miniW * 0.48, bottomH * 0.78);
+          ctx.strokeStyle = '#78350f';
+          ctx.lineWidth = 1.1;
+          ctx.beginPath();
+          ctx.arc(pX, pY, mR, -Math.PI * 0.74, -Math.PI * 0.26);
+          ctx.stroke();
+
+          ctx.fillStyle = '#451a03';
+          ctx.font = '800 6px "JetBrains Mono", monospace';
+          ctx.textAlign = 'center';
+          ctx.fillText(idx === 0 ? 'VU L' : 'VU R', pX, bottomY + bottomH * 0.56);
+
+          const ang = -Math.PI * 0.74 + Math.PI * 0.48 * Math.min(1, lvl * 1.05);
+          ctx.strokeStyle = '#dc2626';
+          ctx.lineWidth = 1.7;
+          ctx.beginPath();
+          ctx.moveTo(pX, pY);
+          ctx.lineTo(pX + Math.cos(ang) * (mR - 1), pY + Math.sin(ang) * (mR - 1));
+          ctx.stroke();
+
+          // 미터 외곽 테두리
+          ctx.strokeStyle = '#18181b';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.roundRect(mx, bottomY, miniW, bottomH, 4);
+          ctx.stroke();
+          ctx.restore();
+        });
+
+        // 우측 트랜스포트 물리 버튼들 (VU 영역 오른쪽 여백 확보)
+        const vuEndX = startX + vuTotalW;
+        const btnStartX = Math.max(w * 0.5 + 8, vuEndX + 12);
+        const btnGap = 4;
+        const availBtnW = w - btnStartX - 18;
+        const btnW = Math.min(26, (availBtnW - btnGap * 4) / 5);
+        if (btnW >= 10) {
+          const btnSpecs = [
+            { col: '#27272a', sym: '◀◀' },
+            { col: '#27272a', sym: '▶▶' },
+            { col: '#16a34a', sym: '▶' },
+            { col: '#27272a', sym: '■' },
+            { col: '#dc2626', sym: '●' }
+          ];
+          btnSpecs.forEach((spec, bIdx) => {
+            const bx = btnStartX + bIdx * (btnW + btnGap);
+            const by = bottomY + bottomH * 0.20;
+            const bh = bottomH * 0.60;
+            ctx.fillStyle = spec.col;
+            ctx.beginPath();
+            ctx.roundRect(bx, by, btnW, bh, 3);
+            ctx.fill();
+            ctx.strokeStyle = '#09090b';
+            ctx.lineWidth = 1.2;
+            ctx.stroke();
+
+            ctx.fillStyle = 'rgba(255,255,255,0.9)';
+            ctx.font = '700 6.5px "Inter", sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText(spec.sym, bx + btnW * 0.5, by + bh * 0.66);
+          });
+        }
+      }
+    }
+
+    // 6) 진공관 앰프 글로우 (TUBE) 비주얼라이저 (KT88 대형 출력관 + 12AX7 프리관 교차 배열 & 입체 유리 글로우)
+    function drawVacuumTubeVisualizer(ctx, w, h, metrics, nowSec) {
+      if (w < 40 || h < 40) return;
+      ctx.clearRect(0, 0, w, h);
+
+      // 랙 섀시 내부 다크 캐비닛 배경 + 상단 방열 그릴
+      const bgGrad = ctx.createLinearGradient(0, 0, 0, h);
+      bgGrad.addColorStop(0, '#060508');
+      bgGrad.addColorStop(0.65, '#120e16');
+      bgGrad.addColorStop(1, '#1c1720');
+      ctx.fillStyle = bgGrad;
+      ctx.fillRect(0, 0, w, h);
+
+      // 상단 내부 배선 실루엣 디테일
+      ctx.strokeStyle = 'rgba(217, 160, 91, 0.18)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(0, h * 0.13);
+      ctx.bezierCurveTo(w * 0.3, h * 0.07, w * 0.65, h * 0.21, w, h * 0.10);
+      ctx.stroke();
+
+      const bass = Math.min(1, ((metrics.spectrum[0] || 0) + (metrics.spectrum[1] || 0) + (metrics.spectrum[2] || 0)) / 2.1);
+      const chassisY = h * 0.78;
+
+      // 하단 매트 블랙 스틸 섀시 & 토글 스위치 / 노브
+      const chGrad = ctx.createLinearGradient(0, chassisY, 0, h);
+      chGrad.addColorStop(0, '#232329');
+      chGrad.addColorStop(1, '#111114');
+      ctx.fillStyle = chGrad;
+      ctx.fillRect(0, chassisY, w, h - chassisY);
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.22)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(0, chassisY);
+      ctx.lineTo(w, chassisY);
+      ctx.stroke();
+
+      // 섀시 전면 파워 토글 스위치, 파일럿 램프 & 볼륨/바이어스 노브
+      const knobY = chassisY + (h - chassisY) * 0.54;
+      ctx.fillStyle = '#27272a';
+      ctx.beginPath();
+      ctx.arc(w * 0.12, knobY, 6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#e4e4e7';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.moveTo(w * 0.12, knobY);
+      ctx.lineTo(w * 0.12 + 7, knobY - 8);
+      ctx.stroke();
+
+      // 파일럿 램프
+      ctx.beginPath();
+      ctx.arc(w * 0.20, knobY, 3.5, 0, Math.PI * 2);
+      ctx.fillStyle = metrics.isPlaying ? '#fb923c' : '#52525b';
+      if (metrics.isPlaying) {
+        ctx.shadowColor = '#fb923c';
+        ctx.shadowBlur = 10;
+      }
+      ctx.fill();
+      ctx.shadowBlur = 0;
+
+      // 중앙 각인 라벨
+      ctx.fillStyle = 'rgba(228, 228, 231, 0.55)';
+      ctx.font = '700 7.5px "JetBrains Mono", monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('KT88 PUSH-PULL CLASS-A', w * 0.50, knobY + 3);
+
+      // 우측 알루미늄 노브 2개
+      [w * 0.80, w * 0.90].forEach((kx, kIdx) => {
+        const kr = Math.min(11, (h - chassisY) * 0.35);
+        const kGrad = ctx.createRadialGradient(kx - 2, knobY - 2, 1, kx, knobY, kr);
+        kGrad.addColorStop(0, '#52525b');
+        kGrad.addColorStop(1, '#09090b');
+        ctx.beginPath();
+        ctx.arc(kx, knobY, kr, 0, Math.PI * 2);
+        ctx.fillStyle = kGrad;
+        ctx.fill();
+        ctx.strokeStyle = '#a1a1aa';
+        ctx.lineWidth = 1.3;
+        ctx.stroke();
+        const kAng = kIdx === 0 ? -0.9 + bass * 0.5 : -0.4;
+        ctx.beginPath();
+        ctx.moveTo(kx, knobY);
+        ctx.lineTo(kx + Math.cos(kAng) * (kr - 2), knobY + Math.sin(kAng) * (kr - 2));
+        ctx.stroke();
+      });
+
+      // KT88 대형 진공관과 12AX7 소형 프리관 교차 배치
+      const slots = w > h * 0.92
+        ? [
+            { x: 0.16, scale: 1.0, label: 'KT88' },
+            { x: 0.30, scale: 0.56, label: '12AX7' },
+            { x: 0.44, scale: 1.0, label: 'KT88' },
+            { x: 0.58, scale: 0.56, label: '12AX7' },
+            { x: 0.72, scale: 1.0, label: 'KT88' },
+            { x: 0.85, scale: 0.88, label: '5U4G' }
+          ]
+        : [
+            { x: 0.24, scale: 1.0, label: 'KT88' },
+            { x: 0.50, scale: 0.58, label: '12AX7' },
+            { x: 0.76, scale: 1.0, label: 'KT88' }
+          ];
+
+      const baseW = Math.min(w * 0.135, h * 0.24, 66);
+      const baseH = Math.min(h * 0.60, baseW * 2.55);
+
+      slots.forEach((slot, idx) => {
+        const cx = w * slot.x;
+        const tubeW = baseW * slot.scale;
+        const tubeH = baseH * slot.scale;
+        const topY = chassisY - tubeH;
+        const chEnergy = idx % 2 === 0 ? metrics.rmsL : metrics.rmsR;
+        const glowPower = metrics.isPlaying ? 0.46 + chEnergy * 0.54 : 0.26;
+
+        ctx.save();
+
+        // 1) 저음 비트에 퍼지는 진공관 내부 일렉트론 블루-바이올렛 글로우
+        const blueGlow = ctx.createRadialGradient(cx, topY + tubeH * 0.46, 2, cx, topY + tubeH * 0.46, tubeW * 1.65);
+        blueGlow.addColorStop(0, `rgba(96, 165, 250, ${0.22 + bass * 0.48})`);
+        blueGlow.addColorStop(0.55, `rgba(129, 140, 248, ${0.10 + bass * 0.24})`);
+        blueGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        ctx.fillStyle = blueGlow;
+        ctx.fillRect(cx - tubeW * 1.8, topY - 18, tubeW * 3.6, tubeH + 24);
+
+        // 2) 유리관 외벽 (상단 돔 형태 + 입체 음영)
+        const glassBodyGrad = ctx.createLinearGradient(cx - tubeW * 0.5, topY, cx + tubeW * 0.5, topY);
+        glassBodyGrad.addColorStop(0, 'rgba(255, 255, 255, 0.14)');
+        glassBodyGrad.addColorStop(0.25, 'rgba(255, 255, 255, 0.03)');
+        glassBodyGrad.addColorStop(0.8, 'rgba(15, 23, 42, 0.18)');
+        glassBodyGrad.addColorStop(1, 'rgba(255, 255, 255, 0.10)');
+        ctx.beginPath();
+        ctx.roundRect(cx - tubeW * 0.5, topY, tubeW, tubeH - 12 * slot.scale, [tubeW * 0.48, tubeW * 0.48, 5, 5]);
+        ctx.fillStyle = glassBodyGrad;
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(226, 232, 240, 0.42)';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        // 상단 실버 게터 코팅
+        ctx.beginPath();
+        ctx.ellipse(cx, topY + tubeW * 0.26, tubeW * 0.34, tubeW * 0.15, 0, Math.PI, Math.PI * 2);
+        ctx.fillStyle = 'rgba(203, 213, 225, 0.38)';
+        ctx.fill();
+
+        // 3) 내부 그레이 애노드 플레이트 + 방열 슬롯 홀
+        const plateW = tubeW * 0.52;
+        const plateH = tubeH * 0.52;
+        const plateY = topY + tubeH * 0.25;
+        ctx.fillStyle = '#18181b';
+        ctx.strokeStyle = 'rgba(161, 161, 170, 0.48)';
+        ctx.lineWidth = 1;
+        ctx.fillRect(cx - plateW * 0.5, plateY, plateW, plateH);
+        ctx.strokeRect(cx - plateW * 0.5, plateY, plateW, plateH);
+
+        // 상/하단 운모(Mica) 디스크
+        [plateY - 2, plateY + plateH + 2].forEach(my => {
+          ctx.beginPath();
+          ctx.ellipse(cx, my, tubeW * 0.42, 2.5, 0, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(228, 228, 231, 0.46)';
+          ctx.fill();
+        });
+
+        // 4) 발광하는 오렌지-앰버 히터 필라멘트 코어
+        const flicker = 0.94 + 0.06 * Math.sin(nowSec * 16 + idx * 2.1);
+        const filGrad = ctx.createRadialGradient(cx, plateY + plateH * 0.52, 1, cx, plateY + plateH * 0.52, tubeW * 0.9);
+        filGrad.addColorStop(0, `rgba(255, 251, 235, ${glowPower * flicker})`);
+        filGrad.addColorStop(0.32, `rgba(251, 146, 60, ${glowPower * 0.96})`);
+        filGrad.addColorStop(0.72, `rgba(234, 88, 12, ${glowPower * 0.48})`);
+        filGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        ctx.fillStyle = filGrad;
+        ctx.fillRect(cx - tubeW * 0.95, plateY - 12, tubeW * 1.9, plateH + 24);
+
+        // 상단/하단 히터 노출 코일 팁
+        ctx.strokeStyle = `rgba(254, 215, 170, ${0.55 + glowPower * 0.45})`;
+        ctx.lineWidth = Math.max(1.5, 2.3 * slot.scale);
+        [-tubeW * 0.13, tubeW * 0.13].forEach(ox => {
+          ctx.beginPath();
+          ctx.moveTo(cx + ox, plateY - 6 * slot.scale);
+          ctx.lineTo(cx + ox, plateY + plateH + 6 * slot.scale);
+          ctx.stroke();
+        });
+
+        // 5) 유리 벽 세로 하이라이트 반사광
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.34)';
+        ctx.lineWidth = Math.max(1.3, 2.2 * slot.scale);
+        ctx.beginPath();
+        ctx.moveTo(cx - tubeW * 0.34, topY + tubeW * 0.44);
+        ctx.lineTo(cx - tubeW * 0.34, chassisY - 16 * slot.scale);
+        ctx.stroke();
+
+        // 6) 하단 메탈 소켓 베이스 & 각인 텍스트
+        const sockH = Math.max(11, 15 * slot.scale);
+        const sockGrad = ctx.createLinearGradient(cx - tubeW * 0.55, 0, cx + tubeW * 0.55, 0);
+        sockGrad.addColorStop(0, '#3f3f46');
+        sockGrad.addColorStop(0.35, '#71717a');
+        sockGrad.addColorStop(1, '#18181b');
+        ctx.fillStyle = sockGrad;
+        ctx.strokeStyle = 'rgba(228, 228, 231, 0.5)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.roundRect(cx - tubeW * 0.55, chassisY - sockH, tubeW * 1.1, sockH, 2);
+        ctx.fill();
+        ctx.stroke();
+
+        if (slot.scale >= 0.85) {
+          ctx.fillStyle = 'rgba(254, 243, 199, 0.88)';
+          ctx.font = '800 7.5px "JetBrains Mono", monospace';
+          ctx.textAlign = 'center';
+          ctx.fillText(slot.label, cx, chassisY - sockH * 0.25);
+        }
+
+        ctx.restore();
+      });
+    }
+
+    // 7) 리사주 스테레오 위상 스코프 (PHASE / LISSAJOUS — 빈티지 오실로스코프 베젤 + 우측 노브 패널)
+    function drawLissajousVisualizer(ctx, w, h, metrics, nowSec) {
+      if (w < 40 || h < 40) return;
+      ctx.clearRect(0, 0, w, h);
+
+      // 빈티지 계측기 웜-그레이 메탈 페이스플레이트
+      const bodyGrad = ctx.createLinearGradient(0, 0, 0, h);
+      bodyGrad.addColorStop(0, '#b0b5be');
+      bodyGrad.addColorStop(0.5, '#9298a3');
+      bodyGrad.addColorStop(1, '#6c727e');
+      ctx.fillStyle = bodyGrad;
+      ctx.fillRect(0, 0, w, h);
+
+      ctx.strokeStyle = '#272930';
+      ctx.lineWidth = 3.5;
+      ctx.strokeRect(1.5, 1.5, w - 3, h - 3);
+
+      const hasRightPanel = w > h * 0.92;
+      const crtAreaW = hasRightPanel ? w * 0.64 : w;
+      const cx = crtAreaW * 0.5;
+      const cy = h * 0.5;
+      const radius = Math.max(24, Math.min(crtAreaW * 0.42, h * 0.42));
+
+      // 원형 CRT 베젤 & 다크 그린 인광 스크린
+      const bezelGrad = ctx.createLinearGradient(cx - radius, cy - radius, cx + radius, cy + radius);
+      bezelGrad.addColorStop(0, '#374151');
+      bezelGrad.addColorStop(1, '#111827');
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius + 9, 0, Math.PI * 2);
+      ctx.fillStyle = bezelGrad;
+      ctx.fill();
+      ctx.strokeStyle = '#090d16';
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+      ctx.clip();
+
+      const crtGrad = ctx.createRadialGradient(cx, cy, 4, cx, cy, radius);
+      crtGrad.addColorStop(0, '#0a2e1f');
+      crtGrad.addColorStop(0.75, '#04160e');
+      crtGrad.addColorStop(1, '#020905');
+      ctx.fillStyle = crtGrad;
+      ctx.fillRect(cx - radius, cy - radius, radius * 2, radius * 2);
+
+      // CRT 정밀 눈금 그리드 & 십자 눈금
+      ctx.strokeStyle = 'rgba(52, 211, 153, 0.18)';
+      ctx.lineWidth = 1;
+      const gridStep = radius / 4;
+      for (let g = -3; g <= 3; g++) {
+        ctx.beginPath();
+        ctx.moveTo(cx + g * gridStep, cy - radius);
+        ctx.lineTo(cx + g * gridStep, cy + radius);
+        ctx.moveTo(cx - radius, cy + g * gridStep);
+        ctx.lineTo(cx + radius, cy + g * gridStep);
+        ctx.stroke();
+      }
+
+      // 다중 위상 인광 궤적 (Lissajous Harmonic Rings + 저진폭 오디오 자동 게인 보정)
+      const avgWaveAmp = metrics.wave.reduce((acc, v) => acc + Math.abs(v), 0) / Math.max(1, metrics.wave.length);
+      const autoGain = avgWaveAmp < 0.14 ? Math.min(4.2, 0.42 / Math.max(0.03, avgWaveAmp)) : 1.15;
+      const stereoSpread = Math.max(0.28, (metrics.rmsL + metrics.rmsR) * 0.45);
+
+      for (let layer = 0; layer < 3; layer++) {
+        ctx.beginPath();
+        const len = metrics.wave.length;
+        const phaseShift = 14 + layer * 9;
+        const scaleMod = 0.78 + layer * 0.11;
+        for (let i = 0; i < len; i++) {
+          const lSample = metrics.wave[i] * autoGain;
+          const rIdx = (i + phaseShift) % len;
+          const harmonicAux = Math.sin((i / len) * Math.PI * (2 + layer) + nowSec * (1.8 + layer * 0.5)) * stereoSpread * 0.35;
+          const rSample = (metrics.wave[rIdx] * autoGain + harmonicAux) * (0.88 + 0.22 * Math.sin(nowSec * 1.9 + layer));
+
+          const rawSide = (lSample - rSample) * 0.68 * scaleMod;
+          const rawMid = (lSample + rSample) * 0.68 * scaleMod;
+          const side = Math.max(-0.92, Math.min(0.92, rawSide));
+          const mid = Math.max(-0.92, Math.min(0.92, rawMid));
+          const px = cx + side * radius;
+          const py = cy - mid * radius;
+
+          if (i === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+        ctx.strokeStyle = layer === 0 ? '#4ade80' : 'rgba(74, 222, 128, 0.38)';
+        ctx.lineWidth = layer === 0 ? 2.2 : 1.1;
+        ctx.shadowColor = 'rgba(74, 222, 128, 0.95)';
+        ctx.shadowBlur = layer === 0 ? 12 : 4;
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      // 우측 계측기 로터리 노브 & 파일럿 LED 컨트롤 패널
+      if (hasRightPanel) {
+        const panelX = crtAreaW + 2;
+        const panelW = w - panelX - 10;
+        ctx.fillStyle = 'rgba(17, 24, 39, 0.22)';
+        ctx.beginPath();
+        ctx.roundRect(panelX, 12, panelW, h - 24, 6);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.16)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        ctx.fillStyle = 'rgba(24, 24, 27, 0.78)';
+        ctx.font = '800 7px "JetBrains Mono", monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('LISSAJOUS 102', panelX + panelW * 0.5, 23);
+
+        const knobRows = [
+          { ry: 0.33, lbl: 'FOCUS' },
+          { ry: 0.56, lbl: 'X-Y GAIN' },
+          { ry: 0.79, lbl: 'PHASE' }
+        ];
+        knobRows.forEach((item, idx) => {
+          const kx = panelX + panelW * 0.34;
+          const ky = h * item.ry;
+          const kr = Math.min(13, panelW * 0.20);
+
+          const kGrad = ctx.createRadialGradient(kx - 2, ky - 2, 1, kx, ky, kr);
+          kGrad.addColorStop(0, '#3f3f46');
+          kGrad.addColorStop(1, '#09090b');
+          ctx.beginPath();
+          ctx.arc(kx, ky, kr, 0, Math.PI * 2);
+          ctx.fillStyle = kGrad;
+          ctx.fill();
+          ctx.strokeStyle = idx === 1 ? '#ef4444' : '#e4e4e7';
+          ctx.lineWidth = 1.8;
+          ctx.stroke();
+
+          // 노브 포인터 선
+          const pAng = -0.8 + idx * 0.7 + Math.sin(nowSec + idx) * 0.15;
+          ctx.beginPath();
+          ctx.moveTo(kx, ky);
+          ctx.lineTo(kx + Math.cos(pAng) * (kr - 2), ky + Math.sin(pAng) * (kr - 2));
+          ctx.stroke();
+
+          // 옆 상태 LED
+          const ledX = panelX + panelW * 0.74;
+          ctx.beginPath();
+          ctx.arc(ledX, ky, 3.8, 0, Math.PI * 2);
+          ctx.fillStyle = metrics.isPlaying ? '#4ade80' : '#374151';
+          if (metrics.isPlaying) {
+            ctx.shadowColor = '#4ade80';
+            ctx.shadowBlur = 8;
+          }
+          ctx.fill();
+          ctx.shadowBlur = 0;
+
+          ctx.fillStyle = 'rgba(24, 24, 27, 0.75)';
+          ctx.font = '700 6px "JetBrains Mono", monospace';
+          ctx.fillText(item.lbl, kx, ky + kr + 8);
+        });
+      }
+    }
+
+    // 8) 랙마운트 LED 도트 매트릭스 피크 홀드 이퀄라이저 (MATRIX — 좌우 랙 핸들 + 주파수 눈금 표기)
+    function drawLedMatrixVisualizer(ctx, w, h, metrics) {
+      if (w < 40 || h < 40) return;
+      ctx.clearRect(0, 0, w, h);
+
+      // 다크 건메탈 랙 페이스플레이트
+      const frameGrad = ctx.createLinearGradient(0, 0, 0, h);
+      frameGrad.addColorStop(0, '#32363f');
+      frameGrad.addColorStop(0.5, '#22252c');
+      frameGrad.addColorStop(1, '#16181d');
+      ctx.fillStyle = frameGrad;
+      ctx.fillRect(0, 0, w, h);
+
+      // 좌우 알루미늄 랙 핸들
+      const handleW = w > 220 ? 13 : 5;
+      if (handleW >= 10) {
+        [6, w - 6 - handleW].forEach(hx => {
+          const hGrad = ctx.createLinearGradient(hx, 0, hx + handleW, 0);
+          hGrad.addColorStop(0, '#a1a1aa');
+          hGrad.addColorStop(0.5, '#e4e4e7');
+          hGrad.addColorStop(1, '#52525b');
+          ctx.fillStyle = hGrad;
+          ctx.beginPath();
+          ctx.roundRect(hx, 18, handleW, h - 36, 4);
+          ctx.fill();
+          ctx.strokeStyle = '#18181b';
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+        });
+      }
+
+      // 내부 리세스드 블랙 LED 창
+      const winX = handleW + 14;
+      const winY = 14;
+      const winW = w - winX * 2;
+      const winH = h - 34;
+
+      ctx.fillStyle = '#060709';
+      ctx.beginPath();
+      ctx.roundRect(winX, winY, winW, winH, 6);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.18)';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      const cols = 24;
+      const rows = 16;
+      const padX = winX + 10;
+      const padY = winY + 10;
+      const innerW = winW - 20;
+      const innerH = winH - 20;
+      const cellW = innerW / cols;
+      const cellH = innerH / rows;
+      const dotR = Math.max(1.8, Math.min(cellW, cellH) * 0.34);
+
+      for (let c = 0; c < cols; c++) {
+        const specIdx = Math.min(31, Math.floor((c / cols) * 28));
+        const val = Math.min(1, metrics.spectrum[specIdx] || 0);
+
+        if (val >= matrixPeaks[c]) {
+          matrixPeaks[c] = val;
+          matrixHoldTimers[c] = 24;
+        } else if (matrixHoldTimers[c] > 0) {
+          matrixHoldTimers[c]--;
+        } else {
+          matrixPeaks[c] = Math.max(0, matrixPeaks[c] - 0.032);
+        }
+
+        const activeRows = Math.round(val * rows);
+        const peakRow = Math.min(rows - 1, Math.round(matrixPeaks[c] * rows));
+
+        for (let r = 0; r < rows; r++) {
+          const cx = padX + (c + 0.5) * cellW;
+          const cy = padY + innerH - (r + 0.5) * cellH;
+          const isLit = r < activeRows;
+          const isPeak = r === peakRow && matrixPeaks[c] > 0.04;
+
+          let onColor = '#22c55e'; // 하단 그린
+          if (r >= rows * 0.78) onColor = '#ef4444'; // 상단 레드
+          else if (r >= rows * 0.52) onColor = '#f59e0b'; // 중단 앰버-옐로우
+
+          ctx.beginPath();
+          ctx.arc(cx, cy, dotR, 0, Math.PI * 2);
+          if (isLit || isPeak) {
+            ctx.fillStyle = isPeak ? '#ffffff' : onColor;
+            ctx.shadowColor = onColor;
+            ctx.shadowBlur = isPeak ? 8 : 5;
+            ctx.fill();
+            ctx.shadowBlur = 0;
+          } else {
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.06)';
+            ctx.fill();
+          }
+        }
+      }
+
+      // 하단 주파수 대역 눈금 라벨 (31Hz ~ 16kHz)
+      const freqLabels = ['31Hz', '63Hz', '125Hz', '250Hz', '500Hz', '1kHz', '2kHz', '4kHz', '8kHz', '16kHz'];
+      ctx.fillStyle = 'rgba(228, 228, 231, 0.75)';
+      ctx.font = '700 7.5px "JetBrains Mono", monospace';
+      ctx.textAlign = 'center';
+      freqLabels.forEach((lbl, idx) => {
+        const lx = padX + ((idx + 0.5) / freqLabels.length) * innerW;
+        ctx.fillText(lbl, lx, h - 8);
+      });
+    }
+
+    // 9) 워터 리플 동심원 파동 (RIPPLE) 비주얼라이저
+    function drawWaterRippleVisualizer(ctx, w, h, metrics, nowSec) {
+      if (w < 40 || h < 40) return;
+      ctx.clearRect(0, 0, w, h);
+
+      const poolGrad = ctx.createRadialGradient(w * 0.5, h * 0.5, 10, w * 0.5, h * 0.5, Math.max(w, h) * 0.75);
+      poolGrad.addColorStop(0, '#0b1322');
+      poolGrad.addColorStop(1, '#05070d');
+      ctx.fillStyle = poolGrad;
+      ctx.fillRect(0, 0, w, h);
+
+      const energy = Math.min(1, (metrics.rmsL + metrics.rmsR) * 0.65);
+      const spawnInterval = metrics.isPlaying ? Math.max(0.28, 0.75 - energy * 0.45) : 1.4;
+
+      if (nowSec - lastRippleSpawnTime > spawnInterval) {
+        lastRippleSpawnTime = nowSec;
+        const colors = ['56, 189, 248', '251, 191, 36', '129, 140, 248', '52, 211, 153'];
+        waterRipples.push({
+          x: w * (0.2 + Math.random() * 0.6),
+          y: h * (0.2 + Math.random() * 0.6),
+          r: 4,
+          maxR: Math.max(w, h) * (0.35 + energy * 0.35),
+          speed: 38 + energy * 55,
+          color: colors[Math.floor(Math.random() * colors.length)]
+        });
+        if (waterRipples.length > 18) waterRipples.shift();
+      }
+
+      for (let i = waterRipples.length - 1; i >= 0; i--) {
+        const rp = waterRipples[i];
+        rp.r += rp.speed * 0.016;
+        const life = 1 - rp.r / rp.maxR;
+        if (life <= 0) {
+          waterRipples.splice(i, 1);
+          continue;
+        }
+
+        // 이중 동심원 물결
+        [1, 0.72].forEach((scale, idx) => {
+          const curR = rp.r * scale;
+          if (curR <= 2) return;
+          ctx.beginPath();
+          ctx.arc(rp.x, rp.y, curR, 0, Math.PI * 2);
+          ctx.strokeStyle = `rgba(${rp.color}, ${(life * (idx === 0 ? 0.65 : 0.32)).toFixed(3)})`;
+          ctx.lineWidth = idx === 0 ? 1.8 : 1;
+          ctx.stroke();
+        });
+      }
+    }
+
+    let visualizerRafId = null;
+
+    function startVisualizerLoop() {
+      if (visualizerRafId !== null) return;
+      visualizerRafId = requestAnimationFrame(runVisualizerLoop);
+    }
+
+    function stopVisualizerLoop() {
+      if (visualizerRafId !== null) {
+        cancelAnimationFrame(visualizerRafId);
+        visualizerRafId = null;
+      }
+    }
+
+    const VISUALIZER_DRAWERS = {
+      scope: drawOscilloscope,
+      vu: drawDualVuMeters,
+      aurora: drawAuroraVisualizer,
+      disc: drawVinylDiscVisualizer,
+      reel: drawReelTapeVisualizer,
+      tube: drawVacuumTubeVisualizer,
+      phase: drawLissajousVisualizer,
+      matrix: drawLedMatrixVisualizer,
+      ripple: drawWaterRippleVisualizer
+    };
+
+    function runVisualizerLoop(ts) {
+      if (!isLyricsOpen || bookletViewMode === 'lyrics') {
+        visualizerRafId = null;
+        return;
+      }
+      const box = document.getElementById('booklet-visualizer-box');
+      const canvas = document.getElementById('booklet-visualizer-canvas');
+      if (box && canvas && !box.classList.contains('hidden')) {
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const targetW = Math.round(box.clientWidth * dpr);
+        const targetH = Math.round(box.clientHeight * dpr);
+        if (targetW > 0 && targetH > 0 && (canvas.width !== targetW || canvas.height !== targetH)) {
+          canvas.width = targetW;
+          canvas.height = targetH;
+        }
+      }
+      if (canvas && canvas.width > 0 && canvas.height > 0) {
+        const ctx = canvas.getContext('2d');
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        ctx.save();
+        ctx.scale(dpr, dpr);
+        const logicalW = canvas.width / dpr;
+        const logicalH = canvas.height / dpr;
+        const nowSec = ts * 0.001;
+        const metrics = sampleAudioMetrics(nowSec);
+        const drawFn = VISUALIZER_DRAWERS[bookletViewMode];
+        if (drawFn) drawFn(ctx, logicalW, logicalH, metrics, nowSec);
+        ctx.restore();
+      }
+      visualizerRafId = requestAnimationFrame(runVisualizerLoop);
+    }
+
+    window.addEventListener('keydown', e => {
+      if (document.activeElement === document.getElementById('search-input')) return;
+      if (e.key === 'Escape') {
+        if (isBookletFullscreen) {
+          toggleBookletFullscreen(false);
+        } else if (isCornerMenuOpen) {
+          toggleCornerMenu(false);
+        } else if (isExpandedMode()) {
+          collapseShowcase();
+        } else if (uiMode === 'ARTIST_ALBUMS_SPINE') {
+          setUiMode('ARTIST_ROTARY');
+        }
+      } else if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+        const step = e.key === 'ArrowRight' ? 1 : -1;
+        if (isArtistRotaryMode()) {
+          stepRotary(step);
+          return;
+        }
+        if (!filteredAlbums.length) return;
+        if (isExpandedMode()) {
+          stepRotary(step);
+        } else {
+          const curIdx = filteredAlbums.findIndex(a => a.id === selectedId);
+          const nextIdx = curIdx === -1 ? 0 : (curIdx + step + filteredAlbums.length) % filteredAlbums.length;
+          previewCenterSpineAlbum(filteredAlbums[nextIdx].id, true);
+        }
+      } else if (e.key === 'Enter') {
+        if (isArtistRotaryMode() && artistGroups.length) {
+          const total = artistGroups.length;
+          const idx = ((Math.round(artistRotaryIndex) % total) + total) % total;
+          selectArtistFromRotary(artistGroups[idx].artist);
+        } else if (isSpineMode() && selectedId) {
+          enterRotaryMode(selectedId);
+        }
+      }
+    });
+
+    let isDraggingSpine = false;
+    let spineDragStartX = 0;
+    let spineScrollStart = 0;
+    let isProgrammaticSpineScroll = false;
+    let spineScrollTimer = null;
+
+    if (spineViewportEl) {
+      spineViewportEl.addEventListener('mousedown', e => {
+        isDraggingSpine = true;
+        spineMoved = false;
+        spineDragStartX = e.pageX;
+        spineScrollStart = spineViewportEl.scrollLeft;
+      });
+      window.addEventListener('mousemove', e => {
+        if (!isDraggingSpine) return;
+        const dx = e.pageX - spineDragStartX;
+        if (Math.abs(dx) > 6) {
+          spineMoved = true;
+          spineViewportEl.scrollLeft = spineScrollStart - dx;
+        }
+      });
+      window.addEventListener('mouseup', () => {
+        isDraggingSpine = false;
+        setTimeout(() => { spineMoved = false; }, 50);
+      });
+
+      spineViewportEl.addEventListener('scroll', () => {
+        renderSpines();
+        if (!isSpineMode() || isProgrammaticSpineScroll || !filteredAlbums.length) return;
+        clearTimeout(spineScrollTimer);
+        spineScrollTimer = setTimeout(() => {
+          const spineStep = 38;
+          const padLeft = spineViewportEl.clientWidth * 0.46;
+          const gap = getSpineCenterGap();
+          const centerOffset = spineViewportEl.scrollLeft + spineViewportEl.clientWidth / 2 - padLeft - gap - 17;
+          const nearestIdx = Math.max(0, Math.min(filteredAlbums.length - 1, Math.round(centerOffset / spineStep)));
+          const nearestAlbum = filteredAlbums[nearestIdx];
+          if (nearestAlbum && nearestAlbum.id !== selectedId) {
+            previewCenterSpineAlbum(nearestAlbum.id, true);
+          }
+        }, 90);
+      }, { passive: true });
+    }
+
+    let isDraggingWheel = false;
+    let wheelDraggedMoved = false;
+    let dragStartX = 0;
+    let dragStartIndex = 0;
+    let wheelSnapTimer = null;
+
+    function beginDrag(clientX) {
+      if (!isExpandedMode() && !isArtistRotaryMode()) return;
+      isDraggingWheel = true;
+      wheelDraggedMoved = false;
+      dragStartX = clientX;
+      dragStartIndex = isArtistRotaryMode() ? artistRotaryIndex : rotaryIndex;
+    }
+
+    function moveDrag(clientX) {
+      if ((!isExpandedMode() && !isArtistRotaryMode()) || !isDraggingWheel) return;
+      const dx = clientX - dragStartX;
+      if (Math.abs(dx) > 6) {
+        wheelDraggedMoved = true;
+      }
+      if (!wheelDraggedMoved) return;
+
+      if (isArtistRotaryMode()) {
+        artistRotaryIndex = dragStartIndex - dx / 135;
+        renderArtistRotaryDrum();
+        return;
+      }
+      if (!filteredAlbums.length) return;
+      rotaryIndex = dragStartIndex - dx / 135;
+      renderRotaryDrum();
+    }
+
+    function endDrag() {
+      if (!isDraggingWheel) return;
+      isDraggingWheel = false;
+      if (!wheelDraggedMoved) return;
+
+      if (isArtistRotaryMode()) {
+        artistRotaryIndex = Math.round(artistRotaryIndex);
+        renderArtistRotaryDrum();
+        return;
+      }
+      if (!isExpandedMode() || !filteredAlbums.length) return;
+      const total = filteredAlbums.length;
+      const targetPos = Math.round(rotaryIndex);
+      const targetIdx = ((targetPos % total) + total) % total;
+      rotaryIndex = targetPos;
+      selectAlbum(filteredAlbums[targetIdx].id, true, false, false);
+    }
+
+    stageEl.addEventListener('mousedown', e => {
+      if ((!isExpandedMode() && !isArtistRotaryMode()) || e.target.closest('#showcase-card') || e.target.closest('#lyrics-booklet')) return;
+      beginDrag(e.clientX);
+    });
+    window.addEventListener('mousemove', e => moveDrag(e.clientX));
+    window.addEventListener('mouseup', endDrag);
+
+    stageEl.addEventListener('touchstart', e => {
+      if ((!isExpandedMode() && !isArtistRotaryMode()) || e.target.closest('#showcase-card') || e.target.closest('#lyrics-booklet')) return;
+      if (e.touches.length === 1) beginDrag(e.touches[0].clientX);
+    }, { passive: true });
+    stageEl.addEventListener('touchmove', e => {
+      if (!isExpandedMode() && !isArtistRotaryMode()) return;
+      if (e.touches.length === 1) moveDrag(e.touches[0].clientX);
+    }, { passive: true });
+    stageEl.addEventListener('touchend', endDrag);
+
+    stageEl.addEventListener('wheel', e => {
+      if ((!isExpandedMode() && !isArtistRotaryMode()) || e.target.closest('#showcase-card') || e.target.closest('#lyrics-booklet')) return;
+      e.preventDefault();
+      const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+      if (isArtistRotaryMode()) {
+        artistRotaryIndex += delta * 0.0045;
+        renderArtistRotaryDrum();
+        clearTimeout(wheelSnapTimer);
+        wheelSnapTimer = setTimeout(() => {
+          artistRotaryIndex = Math.round(artistRotaryIndex);
+          renderArtistRotaryDrum();
+        }, 110);
+        return;
+      }
+      if (!filteredAlbums.length) return;
+      rotaryIndex += delta * 0.0045;
+      renderRotaryDrum();
+      clearTimeout(wheelSnapTimer);
+      wheelSnapTimer = setTimeout(() => {
+        const total = filteredAlbums.length;
+        const targetPos = Math.round(rotaryIndex);
+        const targetIdx = ((targetPos % total) + total) % total;
+        rotaryIndex = targetPos;
+        selectAlbum(filteredAlbums[targetIdx].id, true, false, false);
+      }, 110);
+    }, { passive: false });
+
+    window.addEventListener('resize', () => {
+      const panel = document.getElementById('corner-dropdown-panel');
+      const dev = document.getElementById('spine-device');
+      if (isCornerMenuOpen && panel && dev) {
+        panel.style.maxHeight = `${Math.max(160, dev.clientHeight - 66)}px`;
+      }
+      resizeVisualizerCanvas();
+      updateSpineCenterSplit();
+      if (isArtistRotaryMode()) renderArtistRotaryDrum();
+      else renderRotaryDrum();
+    });
+
+    window.onload = () => {
+      loadPlexLibrary();
+    };
+  </script>
+</body>
+</html>
