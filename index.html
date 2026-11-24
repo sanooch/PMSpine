@@ -2301,17 +2301,10 @@
       if (tr.streamUrl) {
         zeroSignalFrames = 0;
         forceSynthVisualizer = false;
-        initWebAudioAnalyser();
-        audioEl.crossOrigin = 'anonymous';
+        audioEl.removeAttribute('crossorigin');
         audioEl.src = tr.streamUrl;
-        audioEl.play().catch(err => {
-          if (audioEl.crossOrigin) {
-            audioEl.removeAttribute('crossorigin');
-            audioEl.src = tr.streamUrl;
-            audioEl.play().catch(() => showToast('브라우저 자동 재생 정책으로 재생 버튼을 눌러주세요.'));
-          } else {
-            showToast('브라우저 자동 재생 정책으로 재생 버튼을 눌러주세요.');
-          }
+        audioEl.play().catch(() => {
+          showToast('브라우저 자동 재생 정책으로 재생 버튼을 눌러주세요.');
         });
         document.getElementById('play-pause-btn').textContent = '⏸';
         document.getElementById('lyrics-play-pause-btn').textContent = '⏸';
@@ -2427,7 +2420,6 @@
         return;
       }
       if (audioEl.paused) {
-        initWebAudioAnalyser();
         audioEl.play();
         document.getElementById('play-pause-btn').textContent = '⏸';
         document.getElementById('lyrics-play-pause-btn').textContent = '⏸';
@@ -2564,42 +2556,10 @@
     let lastRippleSpawnTime = 0;
 
     function initWebAudioAnalyser() {
-      try {
-        if (!audioCtx) {
-          const AudioContextCls = window.AudioContext || window.webkitAudioContext;
-          if (!AudioContextCls) return;
-          audioCtx = new AudioContextCls();
-        }
-        if (audioCtx.state === 'suspended') {
-          audioCtx.resume();
-        }
-        if (!webAudioConnected) {
-          const source = audioCtx.createMediaElementSource(audioEl);
-          analyserNode = audioCtx.createAnalyser();
-          analyserNode.fftSize = 512;
-          analyserNode.smoothingTimeConstant = 0.78;
-
-          const splitter = audioCtx.createChannelSplitter(2);
-          analyserL = audioCtx.createAnalyser();
-          analyserR = audioCtx.createAnalyser();
-          analyserL.fftSize = 256;
-          analyserR.fftSize = 256;
-
-          source.connect(analyserNode);
-          source.connect(splitter);
-          splitter.connect(analyserL, 0);
-          splitter.connect(analyserR, 1);
-          analyserNode.connect(audioCtx.destination);
-
-          timeDataArray = new Uint8Array(analyserNode.frequencyBinCount);
-          freqDataArray = new Uint8Array(analyserNode.frequencyBinCount);
-          timeDataL = new Uint8Array(analyserL.frequencyBinCount);
-          timeDataR = new Uint8Array(analyserR.frequencyBinCount);
-          webAudioConnected = true;
-        }
-      } catch (e) {
-        console.warn('WebAudio 연결 제한, 합성 파형 모드 동작:', e);
-      }
+      // iPadOS WebKit에서 <audio>를 createMediaElementSource로 AudioContext에 연결하면
+      // AirPlay 출력 라우팅이 차단되므로 연결하지 않고 재생 상태 연동 비주얼라이저를 사용합니다.
+      webAudioConnected = false;
+      forceSynthVisualizer = true;
     }
 
     function resizeVisualizerCanvas() {
